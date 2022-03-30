@@ -22,7 +22,7 @@ If you did all of the above you may now follow these install instructions to set
 4. Run the installation with:
 
     ```zsh
-    ~/.dotfiles/fresh.sh
+    ~/.dotfiles/fresh.sh "your device name"
     ```
 
 6. Restart your computer to finalize the process
