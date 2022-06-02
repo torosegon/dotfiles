@@ -1,7 +1,7 @@
 [core]
   excludesfile = ~/.dotfiles/.gitignore
   trustctime = false
-  autocrlf = true
+  autocrlf = input
 
 [user]
   name = Egon Richárd Tőrös
@@ -17,25 +17,25 @@
   rebase = true
 
 [fetch]
-	prune = true
+  prune = true
 
 [filter "lfs"]
-	clean = git-lfs clean -- %f
-	smudge = git-lfs smudge -- %f
-	process = git-lfs filter-process
-	required = true
+  clean = git-lfs clean -- %f
+  smudge = git-lfs smudge -- %f
+  process = git-lfs filter-process
+  required = true
 
 [init]
-	defaultBranch = master
+  defaultBranch = master
 
 [alias]
   graph = log --pretty=format:'%Cred%h%Creset %C(bold blue)<%an>%Creset%C(yellow)%d%Creset %Cgreen(%cr)%Creset%n%w(80,8,8)%s%n' --graph --name-status
   commits = log --pretty=format:'%C(yellow)%h %Cred%ad %Cblue%an%Cgreen%d %Creset%s' --date=iso
-	sync = !legit sync
-	publish = !legit publish
-	unpublish = !legit unpublish
-	undo = !legit undo
-	branches = !legit branches
+  sync = !legit sync
+  publish = !legit publish
+  unpublish = !legit unpublish
+  undo = !legit undo
+  branches = !legit branches
 
 [color]
   pager = true

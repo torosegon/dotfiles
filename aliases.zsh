@@ -40,14 +40,15 @@ alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
 
+# PHP
+alias composer="valet composer"
+alias php="valet php"
+
 # Laravel
 alias artisan="php artisan"
 alias tinker="php artisan tinker"
 alias seed="php artisan db:seed"
 alias serve="php artisan serve"
-
-# PHP
-alias composer="php -d memory_limit=-1 /opt/homebrew/bin/composer"
 
 # Git
 alias gti="git"
