@@ -8,4 +8,4 @@ export LANG=en_US.UTF-8
 [[ -f "$DOTFILES/path.zsh" ]] && . $DOTFILES/path.zsh
 [[ -f "$DOTFILES/aliases.zsh" ]] && . $DOTFILES/aliases.zsh
 
-eval "$(starship init zsh)"
+export PROMPT="%B %1~ %(!.#.>) %b"

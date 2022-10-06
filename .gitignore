@@ -31,4 +31,5 @@ Thumbs.db
 .vagrant/
 
 Brewfile.lock.json
+.Brewfile.swp
 Caskfile.lock.json

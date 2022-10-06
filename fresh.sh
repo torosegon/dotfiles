@@ -15,6 +15,7 @@ rm -rf $HOME/.zshrc
 ln -s $HOME/.dotfiles/.zshrc $HOME/.zshrc
 rm -rf $HOME/.gitconfig
 ln -s $HOME/.dotfiles/.gitconfig $HOME/.gitconfig
+ln -s $HOME/.dotfiles/.hushlogin $HOME/.hushlogin
 
 # Update Homebrew recipes
 brew update
