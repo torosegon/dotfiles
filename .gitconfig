@@ -3,12 +3,17 @@
   trustctime = false
   autocrlf = input
 
-[user]
-  name = Egon Richárd Tőrös
-  email = 1849338+torosegon@users.noreply.github.com
+[include]
+  path = ~/.dotfiles/exports/work.gitconfig
 
-[includeIf "gitdir:gitlab/"]
-  path = .gitconfig-gitlab
+[includeIf "hasconfig:remote.*.url:https://gitlab.com/**"]
+  path = ~/.dotfiles/exports/gitlab.gitconfig
+
+[includeIf "hasconfig:remote.*.url:https://github.com/**"]
+  path = ~/.dotfiles/exports/github.gitconfig
+
+[init]
+  defaultbranch = main
 
 [push]
   default = current
@@ -24,9 +29,6 @@
   smudge = git-lfs smudge -- %f
   process = git-lfs filter-process
   required = true
-
-[init]
-  defaultBranch = master
 
 [alias]
   graph = log --pretty=format:'%Cred%h%Creset %C(bold blue)<%an>%Creset%C(yellow)%d%Creset %Cgreen(%cr)%Creset%n%w(80,8,8)%s%n' --graph --name-status
