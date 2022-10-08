@@ -6,10 +6,10 @@
 [include]
   path = ~/.dotfiles/exports/work.gitconfig
 
-[includeIf "hasconfig:remote.*.url:git@gitlab.com:torosegon/**"]
+[includeIf "hasconfig:remote.*.url:git@gitlab.com:**/**"]
   path = ~/.dotfiles/exports/gitlab.gitconfig
 
-[includeIf "hasconfig:remote.*.url:git@github.com:torosegon/**"]
+[includeIf "hasconfig:remote.*.url:git@github.com:**/**"]
   path = ~/.dotfiles/exports/github.gitconfig
 
 [init]
