@@ -1,0 +1,7 @@
+#!/bin/sh
+
+for file in $1; do
+  avifenc --speed --min 25 --max 35 "$file" -o "${file%.*}.avif";
+  cwebp -q 50 "$file" -o "${file%.*}.webp";
+done
+

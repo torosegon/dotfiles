@@ -80,13 +80,17 @@ defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
 defaults write NSGlobalDomain KeyRepeat -int 2
 defaults write NSGlobalDomain InitialKeyRepeat -int 15
 
+# Reducing motion
+defaults write com.apple.Accessibility ReduceMotionEnabled -int 1
+
 # Set language and text formats
-# Note: if you’re in the US, replace `EUR` with `USD`, `Centimeters` with
-# `Inches`, `en_GB` with `en_US`, and `true` with `false`.
-defaults write NSGlobalDomain AppleLanguages -array "en" "hu"
+defaults write NSGlobalDomain AppleLanguages -array "hu-US" "hu" "en-US"
 defaults write NSGlobalDomain AppleLocale -string "hu@currency=HUF"
 defaults write NSGlobalDomain AppleMeasurementUnits -string "Centimeters"
+defaults write NSGlobalDomain AppleTemperatureUnit -string "Celsius"
 defaults write NSGlobalDomain AppleMetricUnits -bool true
+defaults write NSGlobalDomain AppleFirstWeekday -dict gregorian 2
+defaults write NSGlobalDomain AppleICUForce24HourTime -int 1
 
 # Set the timezone; see `sudo systemsetup -listtimezones` for other values
 sudo systemsetup -settimezone "Europe/Budapest" > /dev/null
@@ -188,11 +192,19 @@ defaults write com.apple.finder FXInfoPanesExpanded -dict \
     OpenWith -bool true \
     Privileges -bool true
 
+defaults write com.apple.finder NewWindowTargetPath -string "file://$HOME"
+
+defaults write com.apple.finder ShowExternalHardDrivesOnDesktop -int 0
+
+defaults write com.apple.finder ShowHardDrivesOnDesktop -int 0
+
+defaults write com.apple.finder ShowRemovableMediaOnDesktop -int 0
+
 ###############################################################################
 # Dock, Dashboard, and hot corners                                            #
 ###############################################################################
 
-# Set the icon size of Dock items to 36 pixels
+# Set the icon size of Dock items to 16 pixels
 defaults write com.apple.dock tilesize -int 16
 
 # Change minimize/maximize window effect
