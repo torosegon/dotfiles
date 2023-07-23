@@ -24,14 +24,8 @@ brew update
 brew tap homebrew/bundle
 brew bundle --file $HOME/.dotfiles/Brewfile
 
-# Install PHP extensions with PECL
-pecl install imagick redis memcached
-
 # Install global Composer packages
-/opt/homebrew/bin/composer global require laravel/valet laravel/installer laravel/forge-cli beyondcode/expose spatie/global-ray
-
-# Install Laravel Valet
-$HOME/.composer/vendor/bin/valet install
+/opt/homebrew/bin/composer global require laravel/installer laravel/forge-cli beyondcode/expose spatie/global-ray
 
 # Install Global Ray
 $HOME/.composer/vendor/bin/global-ray install

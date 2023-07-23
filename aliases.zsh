@@ -41,8 +41,8 @@ alias la='ls -A'
 alias l='ls -CF'
 
 # PHP
-alias composer="valet composer"
-alias php="valet php"
+alias composer="herd composer"
+alias php="herd php"
 
 # Laravel
 alias artisan="php artisan"

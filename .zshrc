@@ -9,3 +9,5 @@ export LANG=en_US.UTF-8
 [[ -f "$DOTFILES/aliases.zsh" ]] && . $DOTFILES/aliases.zsh
 
 export PROMPT="%B %1~ %(!.#.>) %b"
+
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
