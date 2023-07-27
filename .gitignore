@@ -28,7 +28,7 @@ Thumbs.db
 
 .idea/
 .vscode
-.vagrant/
+.phpintel
 
 Brewfile.lock.json
 .Brewfile.swp

@@ -24,11 +24,7 @@ brew update
 brew tap homebrew/bundle
 brew bundle --file $HOME/.dotfiles/Brewfile
 
-# Install global Composer packages
-/opt/homebrew/bin/composer global require laravel/installer laravel/forge-cli beyondcode/expose spatie/global-ray
-
-# Install Global Ray
-$HOME/.composer/vendor/bin/global-ray install
+open $HOME/Applications/Herd.app
 
 # Create a Codes directory
 mkdir $HOME/Codes
