@@ -25,13 +25,10 @@ brew 'webp'
 # Development
 brew 'pkgxdev/made/pkgx'
 
-cask_args appdir: "~/Applications", require_sha: true
-
 # Apps
 cask '1password'
 cask 'bartender'
 cask 'boop'
-cask 'balance-lock'
 cask 'dbngin'
 cask 'discord'
 cask 'docker'
