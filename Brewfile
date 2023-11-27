@@ -23,11 +23,7 @@ brew 'gifsicle'
 brew 'webp'
 
 # Development
-brew 'mailpit'
-brew 'meilisearch'
-brew 'mysql'
-brew 'node'
-brew 'nvm'
+brew 'pkgxdev/made/pkgx'
 
 cask_args appdir: "~/Applications", require_sha: true
 
@@ -36,6 +32,7 @@ cask '1password'
 cask 'bartender'
 cask 'boop'
 cask 'balance-lock'
+cask 'dbngin'
 cask 'discord'
 cask 'docker'
 cask 'droplr'
