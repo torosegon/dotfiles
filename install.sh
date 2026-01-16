@@ -11,7 +11,7 @@ echo ""
 # Install official packages
 echo ">>> Installing official packages..."
 if [ -f "$DOTFILES_DIR/packages/official.txt" ]; then
-    sudo pacman -S --needed - < "$DOTFILES_DIR/packages/official.txt"
+    sudo pacman -S --needed --noconfirm - < "$DOTFILES_DIR/packages/official.txt"
 else
     echo "Warning: official.txt not found"
 fi
@@ -28,7 +28,7 @@ if ! command -v yay &> /dev/null; then
 fi
 
 if [ -f "$DOTFILES_DIR/packages/aur.txt" ]; then
-    yay -S --needed - < "$DOTFILES_DIR/packages/aur.txt"
+    yay -S --needed --noconfirm - < "$DOTFILES_DIR/packages/aur.txt"
 else
     echo "Warning: aur.txt not found"
 fi
@@ -42,11 +42,6 @@ for config in "$DOTFILES_DIR"/config/*; do
     name=$(basename "$config")
     target="$HOME/.config/$name"
 
-    if [ -e "$target" ] && [ ! -L "$target" ]; then
-        echo "Backing up existing $target to ${target}.bak"
-        mv "$target" "${target}.bak"
-    fi
-
     if [ -L "$target" ]; then
         rm "$target"
     fi
@@ -55,25 +50,20 @@ for config in "$DOTFILES_DIR"/config/*; do
     echo "Linked: ~/.config/$name"
 done
 
-# Create .local/bin symlink for ld
+# Create .local/bin symlink for pls
 echo ""
-echo ">>> Setting up .local/bin/ld..."
+echo ">>> Setting up .local/bin/pls..."
 mkdir -p ~/.local/bin
 
-if [ -f "$DOTFILES_DIR/local/bin/ld" ]; then
-    target="$HOME/.local/bin/ld"
-
-    if [ -e "$target" ] && [ ! -L "$target" ]; then
-        echo "Backing up existing $target to ${target}.bak"
-        mv "$target" "${target}.bak"
-    fi
+if [ -f "$DOTFILES_DIR/local/bin/pls" ]; then
+    target="$HOME/.local/bin/pls"
 
     if [ -L "$target" ]; then
         rm "$target"
     fi
 
-    ln -s "$DOTFILES_DIR/local/bin/ld" "$target"
-    echo "Linked: ~/.local/bin/ld"
+    ln -s "$DOTFILES_DIR/local/bin/pls" "$target"
+    echo "Linked: ~/.local/bin/pls"
 fi
 
 echo ""
@@ -81,4 +71,4 @@ echo "=== Installation complete! ==="
 
 rm $HOME/.bashrc
 
-ln -s "$DOTFILES/bashrc" $HOME/.bashrc
+ln -s $DOTFILES_DIR/bashrc $HOME/.bashrc
