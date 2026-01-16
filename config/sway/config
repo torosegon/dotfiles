@@ -1,0 +1,144 @@
+set $mod Mod4
+
+set $left h
+set $down j
+set $up k
+set $right l
+
+set $term footclient
+set $menu fuzzel
+set $browser librewolf
+
+output * bg /usr/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png fill
+
+exec swayidle -w \
+	timeout 300 'swaylock -f -c 000000' \
+	timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
+	before-sleep 'swaylock -f -c 000000'
+
+exec swayosd-server & foot -s & mako & 1password --silent
+
+input type:touchpad {
+    dwt enabled
+    tap enabled
+    natural_scroll enabled
+    middle_emulation enabled
+}
+
+input type:keyboard {
+    xkb_layout "us,hu"
+    xkb_options "grp:caps_toggle"
+    repeat_delay 300
+    repeat_rate 30
+}
+
+mouse_warping container
+focus_follows_mouse no
+
+bindsym $mod+q kill
+bindsym $mod+Shift+c reload
+bindsym $mod+Shift+e exec swaynag -t warning -m 'You pressed the exit shortcut. Do you really want to exit sway? This will end your Wayland session.' -B 'Yes, exit sway' 'swaymsg exit'
+
+bindsym $mod+d exec $menu
+bindsym $mod+t exec $term
+bindsym $mod+b exec $browser
+
+floating_modifier $mod normal
+
+bindsym $mod+$left focus left
+bindsym $mod+$down focus down
+bindsym $mod+$up focus up
+bindsym $mod+$right focus right
+
+bindsym $mod+Left focus left
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+
+bindsym $mod+Shift+$left move left
+bindsym $mod+Shift+$down move down
+bindsym $mod+Shift+$up move up
+bindsym $mod+Shift+$right move right
+
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+
+bindsym $mod+1 workspace number 1
+bindsym $mod+2 workspace number 2
+bindsym $mod+3 workspace number 3
+bindsym $mod+4 workspace number 4
+bindsym $mod+5 workspace number 5
+
+bindsym $mod+Shift+1 move container to workspace number 1
+bindsym $mod+Shift+2 move container to workspace number 2
+bindsym $mod+Shift+3 move container to workspace number 3
+bindsym $mod+Shift+4 move container to workspace number 4
+bindsym $mod+Shift+5 move container to workspace number 5
+
+bindsym $mod+c splith
+bindsym $mod+v splitv
+
+bindsym $mod+s layout stacking
+bindsym $mod+w layout tabbed
+bindsym $mod+e layout toggle split
+
+bindsym $mod+f fullscreen
+
+bindsym $mod+Shift+space floating toggle
+bindsym $mod+space focus mode_toggle
+
+bindsym $mod+a focus parent
+
+bindsym $mod+Shift+minus move scratchpad
+bindsym $mod+minus scratchpad show
+
+mode "resize" {
+    bindsym $left resize shrink width 10px
+    bindsym $down resize grow height 10px
+    bindsym $up resize shrink height 10px
+    bindsym $right resize grow width 10px
+
+    bindsym Left resize shrink width 10px
+    bindsym Down resize grow height 10px
+    bindsym Up resize shrink height 10px
+    bindsym Right resize grow width 10px
+
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+}
+
+bindsym $mod+r mode "resize"
+
+bindsym --locked XF86AudioMute exec swayosd-client --output-volume mute-toggle
+bindsym --locked XF86AudioLowerVolume exec swayosd-client --output-volume -5
+bindsym --locked XF86AudioRaiseVolume exec swayosd-client --output-volume +5
+bindsym --locked XF86AudioMicMute exec swayosd-client --input-volume mute-toggle
+
+bindsym --locked XF86AudioPlay exec swayosd-client --playerctl play-pause
+bindsym --locked XF86AudioPrev exec swayosd-client --playerctl previous
+bindsym --locked XF86AudioNext exec swayosd-client --playerctl next
+
+bindsym --locked XF86MonBrightnessDown exec swayosd-client --brightness -10
+bindsym --locked XF86MonBrightnessUp exec swayosd-client --brightness +10
+
+bindsym Print exec flameshot gui &
+
+#for_window [title="Discord"] inhibit_idle fullscreen; floating enable; border none
+
+bar {
+    position top
+
+    status_command while ~/.config/sway/bar.sh; do sleep 1; done
+
+    colors {
+        statusline #ffffff
+		background #323232
+		#inactive_workspace #32323200 #32323200 #5c5c5c
+    }
+}
+
+
+
+include /etc/sway/config.d/*

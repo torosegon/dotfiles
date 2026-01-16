@@ -1,0 +1,5 @@
+**/backups/
+**/buffers/
+**/history
+**/*.log
+**/*.bak

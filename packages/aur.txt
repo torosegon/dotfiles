@@ -1,0 +1,9 @@
+1password
+1password-cli
+claude-code
+legit
+librewolf-bin
+phpstorm
+phpstorm-jre
+sublime-text-4
+sylpheed-beta-iconmod
