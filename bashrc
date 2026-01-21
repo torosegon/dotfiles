@@ -18,8 +18,8 @@ alias igt="git"
 alias gt="git"
 alias gi="git"
 
-alias php="ld php"
-alias composer="ld composer"
+alias php="pls php"
+alias composer="pls composer"
 
 alias artisan="php artisan"
 

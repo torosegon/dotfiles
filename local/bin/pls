@@ -1,15 +1,8 @@
 #!/usr/bin/env bash
-
-# pls - PHP Local Server
-# 
-# Simple local development environment manager for PHP projects
-# Caddy webserver + PHP-FPM + mkcert HTTPS
-
 set -e
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 
-# === Configuration Variables ===
 PLS_DIR="${PLS_DIR:-$HOME/.local/share/pls}"
 PLS_CONFIG_DIR="${PLS_CONFIG_DIR:-$HOME/.config/pls}"
 PLS_SITES_DIR="$PLS_CONFIG_DIR/sites"
@@ -23,7 +16,6 @@ PHP_RUN_DIR="$PHP_DIR/run"
 
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/Codes}"
 
-# System PHP version detection (pacman)
 detect_system_php_version() {
     if command -v php &> /dev/null; then
         php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;' 2>/dev/null
@@ -34,11 +26,8 @@ detect_system_php_version() {
 DEFAULT_PHP_VERSION="${DEFAULT_PHP_VERSION:-$(detect_system_php_version)}"
 
 CADDY_BIN="${CADDY_BIN:-/usr/sbin/caddy}"
+STATIC_PHP_BASE_URL="https://dl.static-php.dev/static-php-cli/bulk"
 
-# Static PHP download URL
-STATIC_PHP_BASE_URL="https://dl.static-php.dev/static-php-cli/common"
-
-# === Colors ===
 RED=$'\033[0;31m'
 GREEN=$'\033[0;32m'
 YELLOW=$'\033[1;33m'
@@ -47,10 +36,7 @@ CYAN=$'\033[0;36m'
 BOLD=$'\033[1m'
 NC=$'\033[0m'
 
-# === Initialize directories ===
 mkdir -p "$PLS_CONFIG_DIR" "$PLS_SITES_DIR" "$PLS_CERTS_DIR" "$PLS_LOG_DIR" "$PHP_RUN_DIR"
-
-# === Helper functions ===
 
 print_header() {
     echo -e "${BOLD}${CYAN}$1${NC}"
@@ -72,8 +58,6 @@ print_info() {
     echo -e "${BLUE}→${NC} $1"
 }
 
-# === Caddyfile initialization ===
-
 init_caddyfile() {
     if [ ! -f "$CADDYFILE" ]; then
         cat > "$CADDYFILE" << EOF
@@ -87,8 +71,6 @@ EOF
         print_success "Caddyfile created"
     fi
 }
-
-# === Caddy management ===
 
 caddy_is_running() {
     systemctl --user is-active --quiet pls-caddy.service 2>/dev/null
@@ -134,8 +116,6 @@ caddy_reload() {
     systemctl --user reload pls-caddy.service
     print_success "Configuration reloaded"
 }
-
-# === PHP-FPM management ===
 
 php_get_versions() {
     find "$PHP_VERSIONS_DIR" -maxdepth 1 -type d -name "php-*" 2>/dev/null | \
@@ -227,8 +207,6 @@ php_list() {
     echo ""
 }
 
-# === Certificate management ===
-
 generate_cert() {
     local hostname="$1"
     local cert_file="$PLS_CERTS_DIR/${hostname}.pem"
@@ -256,110 +234,42 @@ generate_cert() {
     fi
 }
 
-# === PHP version detection ===
-
 detect_php_version() {
-    local project_path="$1"
-    local detected=""
-    local source=""
+    local project_path="${1:-.}"
+    local detected="" source=""
 
-    # 1. composer.json
     if [ -f "$project_path/composer.json" ]; then
         detected=$(grep -oP '"php"\s*:\s*"[^"]*(\d+\.\d+)' "$project_path/composer.json" 2>/dev/null | grep -oP '\d+\.\d+' | head -1)
         [ -n "$detected" ] && source="composer.json"
     fi
 
-    # 2. .php-version
-    if [ -z "$detected" ] && [ -f "$project_path/.php-version" ]; then
-        detected=$(grep -oP '^\d+\.\d+' "$project_path/.php-version" 2>/dev/null | head -1)
-        [ -n "$detected" ] && source=".php-version"
-    fi
+    for file in .php-version .phpversion; do
+        if [ -z "$detected" ] && [ -f "$project_path/$file" ]; then
+            detected=$(grep -oP '^\d+\.\d+' "$project_path/$file" 2>/dev/null | head -1)
+            [ -n "$detected" ] && source="$file"
+        fi
+    done
 
-    # 3. .phpversion
-    if [ -z "$detected" ] && [ -f "$project_path/.phpversion" ]; then
-        detected=$(grep -oP '^\d+\.\d+' "$project_path/.phpversion" 2>/dev/null | head -1)
-        [ -n "$detected" ] && source=".phpversion"
-    fi
-
-    if [ -n "$detected" ]; then
-        echo "$detected|$source"
-    else
-        echo "$DEFAULT_PHP_VERSION|default"
-    fi
+    echo "${detected:-$DEFAULT_PHP_VERSION}|${source:-default}"
 }
 
-# === Site management ===
+ensure_test_suffix() {
+    local name="$1"
+    [[ "$name" == *.test ]] && echo "$name" || echo "${name}.test"
+}
 
-serve_project() {
+generate_site_config() {
     local hostname="$1"
-    local project_path=""
-    local project_name=""
+    local doc_root="$2"
+    local php_socket="$3"
+    local comment="${4:-}"
 
-    # If not specified, use current folder
-    if [ -z "$hostname" ]; then
-        local current_dir=$(pwd)
+    cat << EOF
+${comment:+# $comment
+}http://${hostname} {
+    redir https://{host}{uri} permanent
+}
 
-        if [[ "$current_dir" == "$PROJECTS_DIR"/* ]]; then
-            project_name=$(echo "$current_dir" | sed "s|$PROJECTS_DIR/||" | cut -d'/' -f1)
-            project_path="$PROJECTS_DIR/$project_name"
-            hostname="${project_name}.test"
-        else
-            print_error "Not in ~/Codes project folder"
-            echo ""
-            echo "  Usage:"
-            echo "    cd ~/Codes/myproject && pls serve"
-            echo "    pls serve myproject"
-            return 1
-        fi
-    else
-        # Handle .test suffix
-        if [[ "$hostname" == *.test ]]; then
-            project_name="${hostname%.test}"
-        else
-            project_name="$hostname"
-            hostname="${project_name}.test"
-        fi
-        project_path="$PROJECTS_DIR/$project_name"
-    fi
-
-    # Does project exist?
-    if [ ! -d "$project_path" ]; then
-        print_error "Project not found: $project_path"
-        echo ""
-        cmd_projects
-        return 1
-    fi
-
-    local site_file="$PLS_SITES_DIR/${hostname}.conf"
-
-    if [ -f "$site_file" ]; then
-        print_warning "Site already exists: $hostname"
-        return 1
-    fi
-
-    # PHP version
-    local php_info=$(detect_php_version "$project_path")
-    local php_version=$(echo "$php_info" | cut -d'|' -f1)
-    local php_source=$(echo "$php_info" | cut -d'|' -f2)
-
-    # Document root
-    local doc_root="$project_path"
-    [ -d "$project_path/public" ] && doc_root="$project_path/public"
-    [ -d "$project_path/web" ] && doc_root="$project_path/web"
-
-    # PHP socket
-    local php_socket=""
-    if [ -S "$PHP_RUN_DIR/php${php_version}-fpm.sock" ]; then
-        php_socket="unix/$PHP_RUN_DIR/php${php_version}-fpm.sock"
-    else
-        print_error "PHP $php_version FPM is not running"
-        echo "  Start it: pls start"
-        return 1
-    fi
-
-    generate_cert "$hostname" || return 1
-
-    cat > "$site_file" << EOF
 https://${hostname} {
     tls $PLS_CERTS_DIR/${hostname}.pem $PLS_CERTS_DIR/${hostname}-key.pem
     root * ${doc_root}
@@ -368,12 +278,63 @@ https://${hostname} {
     log {
         output file $PLS_LOG_DIR/${hostname}.log
     }
-    @phpFiles path *.php
-    handle_errors {
-        respond "{err.status_code} {err.status_text}"
-    }
 }
 EOF
+}
+
+serve_project() {
+    local input="$1"
+    local project_path="" project_name="" hostname=""
+
+    if [ -z "$input" ]; then
+        local current_dir=$(pwd)
+        if [[ "$current_dir" != "$PROJECTS_DIR"/* ]]; then
+            print_error "Not in ~/Codes project folder"
+            echo ""
+            echo "  Usage:"
+            echo "    cd ~/Codes/myproject && pls serve"
+            echo "    pls serve myproject"
+            return 1
+        fi
+        project_name=$(echo "$current_dir" | sed "s|$PROJECTS_DIR/||" | cut -d'/' -f1)
+    else
+        project_name="${input%.test}"
+    fi
+
+    hostname=$(ensure_test_suffix "$project_name")
+    project_path="$PROJECTS_DIR/$project_name"
+
+    if [ ! -d "$project_path" ]; then
+        print_error "Project not found: $project_path"
+        echo ""
+        cmd_projects
+        return 1
+    fi
+
+    local site_file="$PLS_SITES_DIR/${hostname}.conf"
+    if [ -f "$site_file" ]; then
+        print_warning "Site already exists: $hostname"
+        return 1
+    fi
+
+    local php_info=$(detect_php_version "$project_path")
+    local php_version=${php_info%|*}
+    local php_source=${php_info#*|}
+
+    local doc_root="$project_path"
+    for dir in public web; do
+        [ -d "$project_path/$dir" ] && doc_root="$project_path/$dir" && break
+    done
+
+    if [ ! -S "$PHP_RUN_DIR/php${php_version}-fpm.sock" ]; then
+        print_error "PHP $php_version FPM is not running"
+        echo "  Start it: pls start"
+        return 1
+    fi
+    local php_socket="unix/$PHP_RUN_DIR/php${php_version}-fpm.sock"
+
+    generate_cert "$hostname" || return 1
+    generate_site_config "$hostname" "$doc_root" "$php_socket" > "$site_file"
 
     echo ""
     print_success "Site created: $project_name"
@@ -381,23 +342,61 @@ EOF
     echo -e "  ${BLUE}PHP:${NC}  $php_version ($php_source)"
     echo -e "  ${BLUE}Root:${NC} $doc_root"
 
-    if caddy_is_running; then
-        caddy_reload
-    else
-        print_warning "Caddy is not running. Start it: pls start"
+    caddy_is_running && caddy_reload || print_warning "Caddy is not running. Start it: pls start"
+}
+
+alias_site() {
+    local existing="$1" alias_name="$2"
+
+    if [ -z "$existing" ] || [ -z "$alias_name" ]; then
+        print_error "Usage: pls alias <existing-site> <new-alias>"
+        echo "  Example: pls alias myproject api.myproject"
+        return 1
     fi
+
+    existing=$(ensure_test_suffix "$existing")
+    alias_name=$(ensure_test_suffix "$alias_name")
+
+    local existing_file="$PLS_SITES_DIR/${existing}.conf"
+    if [ ! -f "$existing_file" ]; then
+        print_error "Site not found: $existing"
+        echo ""
+        list_sites
+        return 1
+    fi
+
+    local alias_file="$PLS_SITES_DIR/${alias_name}.conf"
+    if [ -f "$alias_file" ]; then
+        print_warning "Site already exists: $alias_name"
+        return 1
+    fi
+
+    local doc_root=$(grep -oP 'root \* \K[^\s]+' "$existing_file" | head -1)
+    local php_socket=$(grep -oP 'php_fastcgi \K[^\s]+' "$existing_file" | head -1)
+
+    if [ -z "$doc_root" ] || [ -z "$php_socket" ]; then
+        print_error "Could not parse existing site config"
+        return 1
+    fi
+
+    generate_cert "$alias_name" || return 1
+    generate_site_config "$alias_name" "$doc_root" "$php_socket" "Alias for: ${existing}" > "$alias_file"
+
+    echo ""
+    print_success "Alias created: $alias_name -> $existing"
+    echo -e "  ${BLUE}URL:${NC}  https://${alias_name}"
+    echo -e "  ${BLUE}Root:${NC} $doc_root"
+
+    caddy_is_running && caddy_reload || print_warning "Caddy is not running. Start it: pls start"
 }
 
 remove_site() {
-    local hostname="$1"
-
-    if [ -z "$hostname" ]; then
+    if [ -z "$1" ]; then
         print_error "Usage: pls remove <hostname>"
         return 1
     fi
 
-    [[ "$hostname" != *.test ]] && hostname="${hostname}.test"
-
+    local hostname=$(ensure_test_suffix "$1")
     local site_file="$PLS_SITES_DIR/${hostname}.conf"
 
     if [ ! -f "$site_file" ]; then
@@ -418,44 +417,189 @@ list_sites() {
     print_header "Active sites"
     echo ""
 
-    local count=$(find "$PLS_SITES_DIR" -name "*.conf" 2>/dev/null | wc -l)
-
-    if [ "$count" -eq 0 ]; then
+    local sites=("$PLS_SITES_DIR"/*.conf)
+    if [ ! -f "${sites[0]}" ]; then
         print_warning "No sites configured"
         echo "  Create one: cd ~/Codes/myproject && pls serve"
         echo ""
         return 0
     fi
 
-    for site_file in "$PLS_SITES_DIR"/*.conf; do
-        [ -f "$site_file" ] || continue
-
+    for site_file in "${sites[@]}"; do
         local hostname=$(basename "$site_file" .conf)
-        local backend=""
+        local alias_for=$(grep -oP '^# Alias for: \K.+' "$site_file" 2>/dev/null)
+        local php_ver=$(grep -oP 'php\K[0-9.]+' "$site_file" | head -1)
 
-        if grep -q "php_fastcgi" "$site_file"; then
-            local php_ver=$(grep -oP 'php\K[0-9.]+' "$site_file" | head -1)
-            backend="PHP $php_ver"
+        if [ -n "$alias_for" ]; then
+            echo -e "  ${CYAN}↪${NC}  https://${hostname} ${YELLOW}[alias → ${alias_for}]${NC}"
         else
-            backend=$(grep -oP 'reverse_proxy \K[^\s]+' "$site_file" | head -1)
+            echo -e "  ${GREEN}🔒${NC} ${BOLD}https://${hostname}${NC} → PHP $php_ver"
         fi
-
-        echo -e "  ${GREEN}🔒${NC} ${BOLD}https://${hostname}${NC} → $backend"
     done
     echo ""
 }
 
-# === Commands ===
+open_site() {
+    if [ -z "$1" ]; then
+        print_error "Usage: pls open <hostname>"
+        return 1
+    fi
+
+    local hostname=$(ensure_test_suffix "$1")
+    local site_file="$PLS_SITES_DIR/${hostname}.conf"
+
+    if [ ! -f "$site_file" ]; then
+        print_error "Site not found: $hostname"
+        return 1
+    fi
+
+    local url="https://${hostname}"
+    print_info "Opening $url"
+
+    if command -v xdg-open &>/dev/null; then
+        xdg-open "$url" 2>/dev/null &
+    elif command -v open &>/dev/null; then
+        open "$url"
+    elif command -v wslview &>/dev/null; then
+        wslview "$url"
+    else
+        print_error "No browser opener found"
+        echo "  URL: $url"
+        return 1
+    fi
+}
+
+edit_site() {
+    if [ -z "$1" ]; then
+        print_error "Usage: pls edit <hostname>"
+        return 1
+    fi
+
+    local hostname=$(ensure_test_suffix "$1")
+    local site_file="$PLS_SITES_DIR/${hostname}.conf"
+
+    if [ ! -f "$site_file" ]; then
+        print_error "Site not found: $hostname"
+        return 1
+    fi
+
+    local editor="${EDITOR:-${VISUAL:-nano}}"
+    "$editor" "$site_file"
+
+    if caddy_is_running; then
+        read -rp "Reload Caddy config? [Y/n] " answer
+        [[ "${answer:-y}" =~ ^[Yy]?$ ]] && caddy_reload
+    fi
+}
+
+info_site() {
+    if [ -z "$1" ]; then
+        print_error "Usage: pls info <hostname>"
+        return 1
+    fi
+
+    local hostname=$(ensure_test_suffix "$1")
+    local site_file="$PLS_SITES_DIR/${hostname}.conf"
+
+    if [ ! -f "$site_file" ]; then
+        print_error "Site not found: $hostname"
+        return 1
+    fi
+
+    local alias_for=$(grep -oP '^# Alias for: \K.+' "$site_file" 2>/dev/null)
+    local doc_root=$(grep -oP 'root \* \K[^\s]+' "$site_file" | head -1)
+    local php_socket=$(grep -oP 'php_fastcgi \K[^\s]+' "$site_file" | head -1)
+    local php_ver=$(echo "$php_socket" | grep -oP 'php\K[0-9.]+')
+    local cert_file="$PLS_CERTS_DIR/${hostname}.pem"
+    local log_file="$PLS_LOG_DIR/${hostname}.log"
+
+    echo ""
+    print_header "Site: $hostname"
+    echo ""
+    echo -e "  ${BLUE}URL:${NC}      https://${hostname}"
+    [ -n "$alias_for" ] && echo -e "  ${BLUE}Alias of:${NC} $alias_for"
+    echo -e "  ${BLUE}Root:${NC}     $doc_root"
+    echo -e "  ${BLUE}PHP:${NC}      $php_ver"
+    echo -e "  ${BLUE}Socket:${NC}   $php_socket"
+    echo -e "  ${BLUE}Config:${NC}   $site_file"
+    echo -e "  ${BLUE}Cert:${NC}     $cert_file"
+    echo -e "  ${BLUE}Log:${NC}      $log_file"
+
+    if [ -f "$cert_file" ]; then
+        local expiry=$(openssl x509 -enddate -noout -in "$cert_file" 2>/dev/null | cut -d= -f2)
+        [ -n "$expiry" ] && echo -e "  ${BLUE}Expires:${NC}  $expiry"
+    fi
+
+    if [ -f "$log_file" ]; then
+        local log_size=$(du -h "$log_file" 2>/dev/null | cut -f1)
+        echo -e "  ${BLUE}Log size:${NC} $log_size"
+    fi
+    echo ""
+}
+
+cmd_trust() {
+    echo ""
+    print_header "Certificate Trust Status"
+    echo ""
+
+    if ! command -v mkcert &>/dev/null; then
+        print_error "mkcert is not installed"
+        echo "  Install: sudo pacman -S mkcert nss"
+        return 1
+    fi
+
+    local ca_root=$(mkcert -CAROOT 2>/dev/null)
+    local ca_cert="$ca_root/rootCA.pem"
+
+    if [ ! -f "$ca_cert" ]; then
+        print_warning "Local CA not created yet"
+        echo ""
+        read -rp "Create and install local CA? [Y/n] " answer
+        if [[ "${answer:-y}" =~ ^[Yy]?$ ]]; then
+            mkcert -install
+            print_success "Local CA installed"
+        fi
+        return
+    fi
+
+    print_success "CA Root: $ca_root"
+
+    local ca_expiry=$(openssl x509 -enddate -noout -in "$ca_cert" 2>/dev/null | cut -d= -f2)
+    local ca_subject=$(openssl x509 -subject -noout -in "$ca_cert" 2>/dev/null | sed 's/subject=//')
+    echo -e "  ${BLUE}Subject:${NC} $ca_subject"
+    echo -e "  ${BLUE}Expires:${NC} $ca_expiry"
+
+    echo ""
+    if trust list 2>/dev/null | grep -q "mkcert"; then
+        print_success "CA is trusted by the system"
+    else
+        print_warning "CA may not be in system trust store"
+        echo ""
+        read -rp "Reinstall CA to trust store? [Y/n] " answer
+        if [[ "${answer:-y}" =~ ^[Yy]?$ ]]; then
+            mkcert -install
+            print_success "CA reinstalled"
+        fi
+    fi
+
+    if [ -d "$HOME/.mozilla/firefox" ]; then
+        echo ""
+        if certutil -L -d "$HOME/.mozilla/firefox/"*.default* 2>/dev/null | grep -q "mkcert"; then
+            print_success "CA is trusted by Firefox"
+        else
+            print_warning "CA may not be trusted by Firefox"
+            echo "  Run: mkcert -install"
+        fi
+    fi
+
+    echo ""
+}
 
 cmd_start() {
     echo ""
     print_header "Starting PHP Local Server"
     echo ""
-
-    # Start PHP-FPM
     php_start_all
-
-    # Start Caddy
     caddy_start
 
     echo ""
@@ -487,24 +631,19 @@ cmd_status() {
     print_header "PHP Local Server"
     echo ""
 
-    # Caddy status
     echo -n "  Caddy:   "
-    if caddy_is_running; then
-        echo -e "${GREEN}●${NC} running"
-    else
-        echo -e "${RED}●${NC} stopped"
-    fi
+    caddy_is_running && echo -e "${GREEN}●${NC} running" || echo -e "${RED}●${NC} stopped"
 
-    # PHP status
-    local php_running=0
-    local php_total=0
+    local php_running=0 php_total=0
     for version in $(php_get_versions); do
-        php_total=$((php_total + 1))
-        php_is_running "$version" && php_running=$((php_running + 1)) || true
+        ((php_total++))
+        php_is_running "$version" && ((php_running++))
     done
 
     echo -n "  PHP-FPM: "
-    if [ "$php_running" -eq "$php_total" ] && [ "$php_total" -gt 0 ]; then
+    if [ "$php_total" -eq 0 ]; then
+        echo -e "${RED}●${NC} not installed"
+    elif [ "$php_running" -eq "$php_total" ]; then
         echo -e "${GREEN}●${NC} $php_running/$php_total running"
     elif [ "$php_running" -gt 0 ]; then
         echo -e "${YELLOW}●${NC} $php_running/$php_total running"
@@ -512,8 +651,9 @@ cmd_status() {
         echo -e "${RED}●${NC} stopped"
     fi
 
-    # Sites
-    local site_count=$(find "$PLS_SITES_DIR" -name "*.conf" 2>/dev/null | wc -l)
+    local sites=("$PLS_SITES_DIR"/*.conf)
+    local site_count=0
+    [ -f "${sites[0]}" ] && site_count=${#sites[@]}
     echo -e "  Sites:   $site_count active"
 
     list_sites
@@ -544,7 +684,6 @@ cmd_projects() {
     echo ""
 }
 
-# Find PHP binary by version
 php_get_bin() {
     local version="$1"
     local php_bin="$PHP_VERSIONS_DIR/php-${version}/php"
@@ -553,186 +692,77 @@ php_get_bin() {
         echo "$php_bin"
     elif command -v php &> /dev/null; then
         command -v php
-    else
-        return 1
     fi
 }
 
-# Detect PHP version from current directory
-php_detect_current() {
-    local detected=""
-    local source=""
-
-    # 1. composer.json
-    if [ -f "composer.json" ]; then
-        detected=$(grep -oP '"php"\s*:\s*"[^"]*(\d+\.\d+)' "composer.json" 2>/dev/null | grep -oP '\d+\.\d+' | head -1)
-        [ -n "$detected" ] && source="composer.json"
-    fi
-
-    # 2. .php-version
-    if [ -z "$detected" ] && [ -f ".php-version" ]; then
-        detected=$(grep -oP '^\d+\.\d+' ".php-version" 2>/dev/null | head -1)
-        [ -n "$detected" ] && source=".php-version"
-    fi
-
-    # 3. .phpversion
-    if [ -z "$detected" ] && [ -f ".phpversion" ]; then
-        detected=$(grep -oP '^\d+\.\d+' ".phpversion" 2>/dev/null | head -1)
-        [ -n "$detected" ] && source=".phpversion"
-    fi
-
-    if [ -n "$detected" ]; then
-        echo "$detected|$source"
-    else
-        echo "$DEFAULT_PHP_VERSION|default"
-    fi
-}
-
-# Run PHP CLI with appropriate version
 php_run() {
-    local php_info=$(php_detect_current)
-    local php_version=$(echo "$php_info" | cut -d'|' -f1)
-    local php_source=$(echo "$php_info" | cut -d'|' -f2)
+    local php_info=$(detect_php_version)
+    local php_version=${php_info%|*}
+    local php_source=${php_info#*|}
     local php_bin=$(php_get_bin "$php_version")
 
-    if [ -z "$php_bin" ]; then
-        print_error "PHP $php_version not found"
-        return 1
-    fi
+    [ -z "$php_bin" ] && { print_error "PHP $php_version not found"; return 1; }
 
-    # If no arguments, show version with source
     if [ $# -eq 0 ]; then
         echo -e "${BLUE}PHP $php_version${NC} ($php_source)"
         "$php_bin" -v
         return 0
     fi
 
-    # Run PHP with arguments
     exec "$php_bin" "$@"
 }
 
 cmd_php() {
     local subcmd="${1:-}"
 
-    # FPM management commands
     case "$subcmd" in
         list|ls)
-            php_list
-            return
-            ;;
+            php_list ;;
         fpm)
+            shift; cmd_php "${@:-list}" ;;
+        start|stop)
             shift
-            local fpm_cmd="${1:-list}"
-            shift 2>/dev/null || true
-            case "$fpm_cmd" in
-                start)
-                    if [ -z "$1" ]; then
-                        php_start_all
-                    else
-                        php_start "$1"
-                    fi
-                    ;;
-                stop)
-                    if [ -z "$1" ]; then
-                        php_stop_all
-                    else
-                        php_stop "$1"
-                    fi
-                    ;;
-                restart)
-                    if [ -z "$1" ]; then
-                        php_stop_all
-                        sleep 1
-                        php_start_all
-                    else
-                        php_stop "$1"
-                        sleep 1
-                        php_start "$1"
-                    fi
-                    ;;
-                *)
-                    php_list
-                    ;;
-            esac
-            return
-            ;;
-        start)
-            shift
-            if [ -z "$1" ]; then
-                php_start_all
-            else
-                php_start "$1"
-            fi
-            return
-            ;;
-        stop)
-            shift
-            if [ -z "$1" ]; then
-                php_stop_all
-            else
-                php_stop "$1"
-            fi
-            return
-            ;;
+            [ -z "$1" ] && php_${subcmd}_all || php_${subcmd} "$1" ;;
         restart)
             shift
             if [ -z "$1" ]; then
-                php_stop_all
-                sleep 1
-                php_start_all
+                php_stop_all; sleep 1; php_start_all
             else
-                php_stop "$1"
-                sleep 1
-                php_start "$1"
-            fi
-            return
-            ;;
+                php_stop "$1"; sleep 1; php_start "$1"
+            fi ;;
+        *)
+            php_run "$@" ;;
     esac
-
-    # If not FPM command, use CLI wrapper
-    php_run "$@"
 }
 
-# Run Composer with appropriate PHP version
+find_composer() {
+    for path in \
+        "./composer.phar" \
+        "$(command -v composer 2>/dev/null)" \
+        "$HOME/.local/bin/composer" \
+        "$HOME/.composer/composer.phar"
+    do
+        [ -n "$path" ] && [ -f "$path" ] && echo "$path" && return
+    done
+    return 1
+}
+
 cmd_composer() {
-    local php_info=$(php_detect_current)
-    local php_version=$(echo "$php_info" | cut -d'|' -f1)
-    local php_source=$(echo "$php_info" | cut -d'|' -f2)
+    local php_info=$(detect_php_version)
+    local php_version=${php_info%|*}
+    local php_source=${php_info#*|}
     local php_bin=$(php_get_bin "$php_version")
 
-    if [ -z "$php_bin" ]; then
-        print_error "PHP $php_version not found"
-        return 1
-    fi
+    [ -z "$php_bin" ] && { print_error "PHP $php_version not found"; return 1; }
 
-    # Find Composer
-    local composer_bin=""
+    local composer_bin=$(find_composer)
+    [ -z "$composer_bin" ] && { print_error "Composer not found"; echo "  Install: https://getcomposer.org/download/"; return 1; }
 
-    # 1. Project local composer.phar
-    if [ -f "composer.phar" ]; then
-        composer_bin="composer.phar"
-    # 2. System composer
-    elif command -v composer &> /dev/null; then
-        composer_bin=$(command -v composer)
-    # 3. ~/.local/bin/composer
-    elif [ -x "$HOME/.local/bin/composer" ]; then
-        composer_bin="$HOME/.local/bin/composer"
-    # 4. Global composer.phar
-    elif [ -f "$HOME/.composer/composer.phar" ]; then
-        composer_bin="$HOME/.composer/composer.phar"
-    else
-        print_error "Composer not found"
-        echo "  Install: https://getcomposer.org/download/"
-        return 1
-    fi
-
-    # If no arguments, show version
     if [ $# -eq 0 ]; then
         echo -e "${BLUE}Composer${NC} + PHP $php_version ($php_source)"
         exec "$php_bin" "$composer_bin" --version
     fi
 
-    # Run Composer
     exec "$php_bin" "$composer_bin" "$@"
 }
 
@@ -747,7 +777,6 @@ cmd_logs() {
             tail -f "$PHP_DIR"/logs/*.log 2>/dev/null || print_warning "No PHP logs"
             ;;
         *)
-            # Site log
             local logfile="$PLS_LOG_DIR/${target}.log"
             [ ! -f "$logfile" ] && logfile="$PLS_LOG_DIR/${target}.test.log"
 
@@ -759,8 +788,6 @@ cmd_logs() {
             ;;
     esac
 }
-
-# === INSTALL COMMAND ===
 
 install_directories() {
     print_info "Creating directories..."
@@ -800,13 +827,11 @@ install_caddy() {
         }
     fi
 
-    # Set capability for ports 80/443
     print_info "Setting port capability..."
     sudo setcap 'cap_net_bind_service=+ep' "$CADDY_BIN" 2>/dev/null || {
         print_warning "Failed to set capability (sudo required)"
     }
 
-    # Systemd service
     print_info "Creating systemd service..."
     cat > "$HOME/.config/systemd/user/pls-caddy.service" << 'EOF'
 [Unit]
@@ -826,8 +851,6 @@ EOF
 
     systemctl --user daemon-reload
     systemctl --user enable pls-caddy.service 2>/dev/null || true
-
-    # Initialize Caddyfile
     init_caddyfile
 
     print_success "Caddy configured"
@@ -847,7 +870,6 @@ install_mkcert() {
         }
     fi
 
-    # Initialize CA
     if [ ! -d "$(mkcert -CAROOT 2>/dev/null)" ] || [ ! -f "$(mkcert -CAROOT)/rootCA.pem" ]; then
         print_info "Initializing local CA..."
         mkcert -install
@@ -870,29 +892,70 @@ install_dnsmasq() {
         }
     fi
 
-    # .test domain configuration
-    local dnsmasq_conf="/etc/dnsmasq.d/test-tld.conf"
-    if [ ! -f "$dnsmasq_conf" ]; then
-        print_info "Configuring .test domain..."
-        echo "address=/test/127.0.0.1" | sudo tee "$dnsmasq_conf" > /dev/null
-        sudo systemctl enable dnsmasq
-        sudo systemctl restart dnsmasq
+    if grep -q "^#conf-dir=/etc/dnsmasq.d$" /etc/dnsmasq.conf 2>/dev/null; then
+        print_info "Enabling dnsmasq conf-dir..."
+        sudo sed -i 's/^#conf-dir=\/etc\/dnsmasq.d$/conf-dir=\/etc\/dnsmasq.d/' /etc/dnsmasq.conf
     fi
 
-    # resolv.conf check
-    if ! grep -q "127.0.0.1" /etc/resolv.conf 2>/dev/null; then
-        print_warning "Add 127.0.0.1 to /etc/resolv.conf"
-        echo "  nameserver 127.0.0.1"
+    local dnsmasq_conf="/etc/dnsmasq.d/pls.conf"
+    print_info "Configuring dnsmasq..."
+    sudo mkdir -p /etc/dnsmasq.d
+    cat << 'DNSCONF' | sudo tee "$dnsmasq_conf" > /dev/null
+# pls - PHP Local Server DNS config
+# .test domain -> localhost
+address=/test/127.0.0.1
+
+# Use upstream DNS from NetworkManager (DHCP/router)
+resolv-file=/run/NetworkManager/resolv.conf
+
+# Only bind to localhost
+listen-address=127.0.0.1
+bind-interfaces
+DNSCONF
+
+    sudo rm -f /etc/dnsmasq.d/test-tld.conf 2>/dev/null
+
+    local nm_conf="/etc/NetworkManager/conf.d/dns.conf"
+    if [ -d "/etc/NetworkManager" ]; then
+        print_info "Configuring NetworkManager..."
+        sudo rm -f /etc/NetworkManager/conf.d/dnsmasq.conf 2>/dev/null
+        cat << 'NMCONF' | sudo tee "$nm_conf" > /dev/null
+[main]
+dns=none
+NMCONF
+    fi
+
+    print_info "Configuring /etc/resolv.conf..."
+    sudo chattr -i /etc/resolv.conf 2>/dev/null || true
+    echo "nameserver 127.0.0.1" | sudo tee /etc/resolv.conf > /dev/null
+    sudo chattr +i /etc/resolv.conf
+
+    print_info "Restarting services..."
+    sudo systemctl enable dnsmasq
+    sudo systemctl restart dnsmasq
+    sudo systemctl restart NetworkManager 2>/dev/null || true
+
+    sleep 1
+
+    print_info "Verifying DNS..."
+    if dig +short google.com @127.0.0.1 2>/dev/null | grep -qE '^[0-9]+\.'; then
+        print_success "Internet DNS working"
+    else
+        print_warning "Internet DNS may not be working"
+    fi
+
+    if dig +short anything.test @127.0.0.1 2>/dev/null | grep -q "127.0.0.1"; then
+        print_success ".test domain working"
+    else
+        print_warning ".test domain resolution failed"
     fi
 
     print_success "dnsmasq configured"
 }
 
-# Get full PHP version from major.minor (fetched dynamically or use known latest)
 get_php_full_version() {
     local version="$1"
 
-    # Try to get latest version from static-php.dev
     local latest=$(curl -sL "${STATIC_PHP_BASE_URL}/" 2>/dev/null | \
         grep -oP "php-${version}\.[0-9]+-fpm-linux-x86_64" | \
         sort -V | tail -1 | grep -oP "${version}\.[0-9]+")
@@ -902,7 +965,6 @@ get_php_full_version() {
         return
     fi
 
-    # Fallback to known versions
     case "$version" in
         8.1) echo "8.1.34" ;;
         8.2) echo "8.2.30" ;;
@@ -933,7 +995,6 @@ install_php_version() {
     local tmp_dir=$(mktemp -d)
     mkdir -p "$version_dir"
 
-    # Download CLI version
     local cli_url="${STATIC_PHP_BASE_URL}/php-${full_version}-cli-linux-${arch}.tar.gz"
     local cli_file="$tmp_dir/cli.tar.gz"
 
@@ -951,7 +1012,6 @@ install_php_version() {
         print_warning "CLI download failed, will use system PHP as fallback"
     fi
 
-    # Download FPM version
     local fpm_url="${STATIC_PHP_BASE_URL}/php-${full_version}-fpm-linux-${arch}.tar.gz"
     local fpm_file="$tmp_dir/fpm.tar.gz"
 
@@ -963,7 +1023,6 @@ install_php_version() {
             chmod +x "$version_dir/php-fpm"
             print_success "PHP-FPM installed"
         fi
-        # If CLI wasn't available, use php from FPM package if present
         if [ ! -x "$version_dir/php" ] && [ -f "$tmp_dir/php" ]; then
             cp "$tmp_dir/php" "$version_dir/php"
             chmod +x "$version_dir/php"
@@ -975,8 +1034,6 @@ install_php_version() {
     fi
 
     rm -rf "$tmp_dir"
-
-    # PHP-FPM configuration
     install_php_fpm_config "$version"
 
     print_success "PHP $full_version installed"
@@ -990,7 +1047,6 @@ install_php_fpm_config() {
 
     mkdir -p "$version_dir/php-fpm.d"
 
-    # Main FPM config
     cat > "$fpm_conf" << EOF
 [global]
 pid = $PHP_RUN_DIR/php${version}-fpm.pid
@@ -1000,7 +1056,6 @@ daemonize = yes
 include = $version_dir/php-fpm.d/*.conf
 EOF
 
-    # Pool config
     cat > "$pool_conf" << EOF
 [www]
 user = $USER
@@ -1031,7 +1086,6 @@ install_php_all() {
         install_php_version "$version" || true
     done
 
-    # Systemd service
     print_info "Creating PHP-FPM systemd service..."
     cat > "$HOME/.config/systemd/user/pls-php.service" << 'EOF'
 [Unit]
@@ -1194,8 +1248,12 @@ ${BOLD}ENVIRONMENT MANAGEMENT${NC}
 
 ${BOLD}SITE MANAGEMENT${NC}
   ${BLUE}serve${NC} [project]    Serve project (or current folder)
-  ${BLUE}remove${NC} <host>      Remove site
+  ${BLUE}alias${NC} <site> <new> Add alias domain to existing site
+  ${BLUE}remove${NC} <host>      Remove site or alias
   ${BLUE}list${NC}               List active sites
+  ${BLUE}info${NC} <host>        Show detailed site information
+  ${BLUE}open${NC} <host>        Open site in browser
+  ${BLUE}edit${NC} <host>        Edit site config in \$EDITOR
   ${BLUE}projects${NC}           List available projects
 
 ${BOLD}PHP & COMPOSER (alias php="pls php" composer="pls composer")${NC}
@@ -1218,6 +1276,7 @@ ${BOLD}INSTALLATION${NC}
 
 ${BOLD}OTHER${NC}
   ${BLUE}logs${NC} [target]      Show logs (caddy/php/site)
+  ${BLUE}trust${NC}              Check/fix mkcert CA trust status
   ${BLUE}help${NC}               Show help
   ${BLUE}version${NC}            Show version
 
@@ -1225,14 +1284,18 @@ ${BOLD}EXAMPLES${NC}
   pls start                      # Start environment
   cd ~/Codes/myapp && pls serve  # Serve project
   pls serve myapp                # Serve project by name
+  pls alias myapp api.myapp      # Add api.myapp.test alias
+  pls open myapp                 # Open in browser
+  pls info myapp                 # Show site details
+  pls edit myapp                 # Edit Caddy config
 
   cd ~/Codes/myapp && pls php    # PHP version (8.4 if in composer.json)
   pls php artisan migrate        # Laravel migration with correct PHP
   pls composer install           # Composer with correct PHP
-  pls composer update            # Composer update
 
   pls php list                   # PHP-FPM versions
   pls logs myapp.test            # Site log
+  pls trust                      # Check CA trust status
 
 ${BOLD}PHP VERSION DETECTION${NC}
   1. composer.json require.php
@@ -1250,8 +1313,6 @@ ${BOLD}FILES${NC}
 EOF
 }
 
-# === Main entry point ===
-
 main() {
     local cmd="${1:-help}"
     shift 2>/dev/null || true
@@ -1262,14 +1323,18 @@ main() {
         restart)        cmd_restart ;;
         status|st)      cmd_status ;;
         serve)          serve_project "$@" ;;
+        alias)          alias_site "$@" ;;
         remove|rm)      remove_site "$@" ;;
-        list|ls)        list_sites ;;
-        sites)          list_sites ;;
+        list|ls|sites)  list_sites ;;
+        open)           open_site "$@" ;;
+        edit)           edit_site "$@" ;;
+        info)           info_site "$@" ;;
         projects|proj)  cmd_projects ;;
         php)            cmd_php "$@" ;;
         composer)       cmd_composer "$@" ;;
         install)        cmd_install "$@" ;;
         logs|log)       cmd_logs "$@" ;;
+        trust)          cmd_trust ;;
         reload)         caddy_reload ;;
         help|--help|-h) cmd_help ;;
         version|-v|--version) echo "pls version $VERSION" ;;
