@@ -1,0 +1,8 @@
+dbus-update-activation-environment --systemd DISPLAY WAYLAND_DISPLAY > /dev/null 2>&1 &
+swaybg -c '#5e9da3'  >/dev/null 2>&1 &
+swayosd-server >/dev/null 2>&1 &
+mako >/dev/null 2>&1 &
+waybar >/dev/null 2>&1 &
+foot --server >/dev/null 2>&1 &
+1password --silent >/dev/null 2>&1 &
+flameshot >/dev/null 2>&1 &

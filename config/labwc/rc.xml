@@ -1,0 +1,459 @@
+<?xml version="1.0"?>
+
+<labwc_config>
+  <core>
+    <decoration>server</decoration>
+    <gap>8</gap>
+    <adaptiveSync>yes</adaptiveSync>
+    <allowTearing>no</allowTearing>
+    <autoEnableOutputs>yes</autoEnableOutputs>
+    <reuseOutputMode>no</reuseOutputMode>
+    <xwaylandPersistence>no</xwaylandPersistence>
+    <primarySelection>yes</primarySelection>
+  </core>
+
+  <output name="DP-2">
+    <scale>1.5</scale>
+  </output>
+
+  <placement>
+    <policy>cascade</policy>
+    <cascadeOffset x="40" y="30"/>
+  </placement>
+  
+  <theme>
+    <!-- <name>oomox-gruvbox-material-light-s</name> -->
+    <!-- <icon>Haiku</icon> -->
+    <fallbackAppIcon>labwc</fallbackAppIcon>
+    <titlebar>
+      <!-- <layout>icon:iconify,max,close</layout> -->
+      <layout>desk:iconify,max,close</layout>
+      <showTitle>yes</showTitle>
+    </titlebar>    
+    <cornerRadius>4</cornerRadius>
+    <keepBorder>no</keepBorder>
+    <dropShadows>no</dropShadows>
+    <dropShadowsOnTiled>no</dropShadowsOnTiled>
+    
+    <font place="ActiveWindow">
+      <name>Roboto Mono</name>
+      <size>10</size>
+      <slant>italic</slant>
+      <weight>normal</weight>
+    </font>
+    <font place="InactiveWindow">
+      <name>Roboto Mono</name>
+      <size>10</size>
+      <slant>italic</slant>
+      <weight>normal</weight>
+    </font>
+    <font place="MenuItem">
+      <name>Roboto Mono</name>
+      <size>10</size>
+      <slant>normal</slant>
+      <weight>normal</weight>
+    </font>
+    <font place="OnScreenDisplay">
+      <name>Roboto Mono</name>
+      <size>10</size>
+      <slant>normal</slant>
+      <weight>normal</weight>
+    </font>
+  </theme>
+  
+  <windowSwitcher preview="yes" outlines="no" allWorkspaces="yes">
+    <osd show="yes" style="thumbnail" output="all" thumbnailLabelFormat="%T" />
+    <fields>
+      <field content="workspace" width="25%"/>
+      <field content="trimmed_identifier" width="20%"/>
+      <field content="title" width="55%"/>
+    </fields>
+  </windowSwitcher>
+  
+  <resistance>
+    <screenEdgeStrength>20</screenEdgeStrength>
+    <windowEdgeStrength>20</windowEdgeStrength>
+    <unSnapThreshold>20</unSnapThreshold>
+    <unMaximizeThreshold>150</unMaximizeThreshold>
+  </resistance>
+  
+  <resize>
+    <popupShow>Always</popupShow>
+    <drawContents>no</drawContents>
+    <minimumArea>8</minimumArea>
+  </resize>
+    
+  <focus>
+    <followMouse>no</followMouse>
+    <followMouseRequiresMovement>yes</followMouseRequiresMovement>
+    <raiseOnFocus>no</raiseOnFocus>
+  </focus>
+
+  <snapping>
+    <!-- Set range to 0 to disable window snapping completely -->
+    <range inner="10" outer="10"/>
+    <cornerRange>50</cornerRange>
+    <overlay enabled="yes">
+      <delay inner="500" outer="500" />
+    </overlay>
+    <topMaximize>no</topMaximize>
+    <notifyClient>always</notifyClient>
+  </snapping>
+
+  <desktops number="4"/>
+
+  <desktops>
+    <popupTime>0</popupTime>
+  </desktops>
+  
+  <regions>
+    <region name="top-left" x="0%" y="0%" height="50%" width="50%"/>
+    <region name="top" x="0%" y="0%" height="60%" width="100%"/>
+    <region name="top-right" x="50%" y="0%" height="50%" width="50%"/>
+    <region name="left" x="0%" y="0%" height="100%" width="75%"/>
+    <region name="center" x="17%" y="17%" height="66%" width="66%"/>
+    <region name="center-big" x="0%" y="0%" height="100%" width="100%"/>
+    <region name="right" x="75%" y="0%" height="100%" width="25%"/>
+    <region name="bottom-left" x="0%" y="50%" height="50%" width="50%"/>
+    <region name="bottom" x="0%" y="60%" height="40%" width="100%"/>
+    <region name="bottom-right" x="50%" y="50%" height="50%" width="50%"/>
+  </regions>
+
+  <keyboard>
+    <numlock>on</numlock>
+    <layoutScope>global</layoutScope>
+    <repeatRate>30</repeatRate>
+    <repeatDelay>300</repeatDelay>
+    <keybind key="A-Tab">
+      <action name="NextWindow"/>
+    </keybind>
+    <keybind key="W-t">
+      <action name="Execute" command="footclient"/>
+    </keybind>
+    <keybind key="W-b">
+      <action name="Execute" command="helium-browser"/>
+    </keybind>
+    <keybind key="W-Space">
+      <action name="Execute" command="fuzzel"/>
+    </keybind>
+    <keybind key="W-f">
+      <action name="Execute" command="nemo"/>
+    </keybind>
+    <keybind key="W-\">
+      <action name="Execute" command="1password --quick-access" />
+    </keybind>
+    <keybind key="W-q">
+      <action name="Close"/>
+    </keybind>
+    <keybind key="W-S-b">
+      <action name="Execute" command="pkill -SIGUSR2 waybar"/>
+    </keybind>
+    <keybind key="W-C-r">
+      <action name="Execute" command="labwc -r"/>
+    </keybind>
+    <keybind key="W-C-S-Left">
+    <action name="GrowToEdge" direction="left" />
+    </keybind>
+    <keybind key="W-C-S-Right">
+    <action name="GrowToEdge" direction="right" />
+    </keybind>
+    <keybind key="W-C-S-Up">
+    <action name="GrowToEdge" direction="up" />
+    </keybind>
+    <keybind key="W-C-S-Down">
+    <action name="GrowToEdge" direction="down" />
+    </keybind>
+    <keybind key="W-Left">
+      <action name="SnapToEdge" direction="left"/>
+    </keybind>
+    <keybind key="W-Right">
+      <action name="SnapToEdge" direction="right"/>
+    </keybind>
+    <keybind key="W-Up">
+      <action name="SnapToEdge" direction="up"/>
+    </keybind>
+    <keybind key="W-Down">
+      <action name="SnapToEdge" direction="down"/>
+    </keybind>
+
+    <keybind key="W-S-Left">
+      <action name="SnapToRegion" region="top-left"/>
+    </keybind>
+    <keybind key="W-S-Up">
+      <action name="SnapToRegion" region="top-right"/>
+    </keybind>
+    <keybind key="W-S-Right">
+      <action name="SnapToRegion" region="bottom-right"/>
+    </keybind>
+    <keybind key="W-S-Down">
+      <action name="SnapToRegion" region="bottom-left"/>
+    </keybind>
+    <keybind key="W-S-l">
+      <action name="SnapToRegion" region="left"/>
+    </keybind>
+    <keybind key="W-S-c">
+      <action name="SnapToRegion" region="center"/>
+    </keybind>
+    <keybind key="W-S-a">
+      <action name="SnapToRegion" region="center-big"/>
+    </keybind>
+    <keybind key="W-S-r">
+      <action name="SnapToRegion" region="right"/>
+    </keybind>
+
+    <keybind key="W-1">
+      <action name="GoToDesktop" to="1"/>
+    </keybind>
+    <keybind key="W-2">
+      <action name="GoToDesktop" to="2"/>
+    </keybind>
+    <keybind key="W-3">
+      <action name="GoToDesktop" to="3"/>
+    </keybind>
+    <keybind key="W-4">
+      <action name="GoToDesktop" to="4"/>
+    </keybind>
+    <keybind key="W-S-1">
+      <action name="SendToDesktop" to="1" follow="yes"/>
+    </keybind>
+    <keybind key="W-S-2">
+      <action name="SendToDesktop" to="2" follow="yes"/>
+    </keybind>
+    <keybind key="W-S-3">
+      <action name="SendToDesktop" to="3" follow="yes"/>
+    </keybind>
+    <keybind key="W-S-4">
+      <action name="SendToDesktop" to="4" follow="yes"/>
+    </keybind>
+    <keybind key="W-C-Left">
+      <action name="GoToDesktop" to="left"/>
+    </keybind>
+    <keybind key="W-C-Right">
+      <action name="GoToDesktop" to="right"/>
+    </keybind>
+
+    <keybind key="XF86_AudioLowerVolume">
+      <action name="Execute" command="swayosd-client --output-volume -5"/>
+    </keybind>
+    <keybind key="XF86_AudioRaiseVolume">
+      <action name="Execute" command="swayosd-client --output-volume +5"/>
+    </keybind>
+    <keybind key="XF86_AudioMute">
+      <action name="Execute" command="swayosd-client --output-volume mute-toggle"/>
+    </keybind>
+    <keybind key="XF86_AudioMicMute">
+      <action name="Execute" command="swayosd-client --input-volume mute-toggle"/>
+    </keybind>
+    <keybind key="XF86AudioPlay">
+      <action name="Execute" command="swayosd-client --playerctl play-pause"/>
+    </keybind>
+    <keybind key="XF86AudioPrev">
+      <action name="Execute" command="swayosd-client --playerctl previous"/>
+    </keybind>
+    <keybind key="XF86AudioNext">
+      <action name="Execute" command="swayosd-client --playerctl next"/>
+    </keybind>
+    <keybind key="XF86_MonBrightnessUp">
+      <action name="Execute" command="swayosd-client --brightness +10"/>
+    </keybind>
+    <keybind key="XF86_MonBrightnessDown">
+      <action name="Execute" command="swayosd-client --brightness -10"/>
+    </keybind>
+    <keybind key="Print">
+      <action name="Execute" command="grim -l 1"/>
+      <action name="Execute" command="notify-send 'Screenshot!'"/>
+    </keybind>
+  </keyboard>
+
+  <mouse>
+    <doubleClickTime>300</doubleClickTime>
+
+    <context name="Frame">
+      <mousebind button="W-Left" action="Press">
+        <action name="Focus" />
+        <action name="Raise" />
+      </mousebind>
+      <mousebind button="W-Left" action="Drag">
+        <action name="Move" />
+      </mousebind>
+      <mousebind button="W-Right" action="Press">
+        <action name="Focus" />
+        <action name="Raise" />
+      </mousebind>
+      <mousebind button="W-Right" action="Drag">
+        <action name="Resize" />
+      </mousebind>
+    </context>
+
+   <context name="Top">
+      <mousebind button="Left" action="Drag">
+        <action name="Resize" />
+      </mousebind>
+    </context>
+    <context name="Left">
+      <mousebind button="Left" action="Drag">
+        <action name="Resize" />
+      </mousebind>
+    </context>
+    <context name="Right">
+      <mousebind button="Left" action="Drag">
+        <action name="Resize" />
+      </mousebind>
+    </context>
+    <context name="Bottom">
+      <mousebind button="Left" action="Drag">
+        <action name="Resize" />
+      </mousebind>
+    </context>
+
+    <context name="TitleBar">
+      <mousebind button="Left" action="Press">
+        <action name="Focus" />
+        <action name="Raise" />
+      </mousebind>
+      <mousebind button="Right" action="Click">
+        <action name="Focus" />
+        <action name="Raise" />
+      </mousebind>
+      <mousebind direction="Up" action="Scroll">
+        <action name="Unshade" />
+        <action name="Focus" />
+      </mousebind>
+      <mousebind direction="Down" action="Scroll">
+        <action name="Unfocus" />
+        <action name="Shade" />
+      </mousebind>
+    </context>
+
+    <context name="Title">
+      <mousebind button="Left" action="Drag">
+        <action name="Move" />
+      </mousebind>
+      <mousebind button="Left" action="DoubleClick">
+       <action name="SnapToRegion" region="center-big"/>
+      </mousebind>
+      <mousebind button="Right" action="Click">
+        <action name="ShowMenu" menu="client-menu" />
+      </mousebind>
+      <mousebind button="Middle" action="Click">
+        <action name="Kill" />
+      </mousebind>
+    </context>
+
+    <context name="Maximize">
+      <mousebind button="Left" action="Click">
+        <action name="SnapToRegion" region="center-big"/>
+      </mousebind>
+    </context>
+
+    <context name="WindowMenu">
+      <mousebind button="Left" action="Click">
+        <action name="ShowMenu" menu="client-menu" atCursor="no" />
+      </mousebind>
+    </context>
+
+    <context name="Icon">
+      <mousebind button="Left" action="Click">
+        <action name="ShowMenu" menu="client-menu" atCursor="no" />
+      </mousebind>
+    </context>
+
+    <context name="Shade">
+      <mousebind button="Left" action="Click">
+        <action name="ToggleShade" />
+      </mousebind>
+    </context>
+
+    <context name="AllDesktops">
+      <mousebind button="Left" action="Click">
+        <action name="ToggleOmnipresent" />
+      </mousebind>
+    </context>
+
+    <context name="Iconify">
+      <mousebind button="Left" action="Click">
+        <action name="Iconify" />
+      </mousebind>
+    </context>
+
+    <context name="Close">
+      <mousebind button="Left" action="Click">
+        <action name="Close" />
+      </mousebind>
+    </context>
+
+    <context name="Client">
+      <mousebind button="Left" action="Press">
+        <action name="Focus" />
+        <action name="Raise" />
+      </mousebind>
+    </context>
+        
+    <context name="Root">
+      <mousebind button="Right" action="Press">
+        <action name="ShowMenu" menu="root-menu" />
+      </mousebind>
+      <mousebind direction="Up" action="Scroll">
+        <action name="GoToDesktop" to="left" wrap="yes" />
+      </mousebind>
+      <mousebind direction="Down" action="Scroll">
+        <action name="GoToDesktop" to="right" wrap="yes" />
+      </mousebind>
+    </context>
+  </mouse>
+
+  <libinput>
+    <device category="default">
+      <naturalScroll>yes</naturalScroll>
+      <accelProfile>adaptive</accelProfile>
+      <disableWhileTyping>no</disableWhileTyping>
+      <doubleClickSpeed>350</doubleClickSpeed>
+    </device>
+    <device catgory="touchpad">
+      <naturalScroll>yes</naturalScroll>
+      <pointerSpeed>0.3</pointerSpeed>
+      <accelProfile>flat</accelProfile>
+      <tap>yes</tap>
+      <tapAndDrag>yes</tapAndDrag>
+      <dragLock>sticky</dragLock>
+      <threeFingerDrag>yes</threeFingerDrag>
+      <middleEmulation>yes</middleEmulation>
+      <disableWhileTyping>no</disableWhileTyping>
+      <!-- <scrollFactor>0.3</scrollFactor> -->
+    </device>
+  </libinput>
+  
+  <windowRules>
+    <windowRule identifier="helium">
+      <action name="ToggleDecorations"/>
+    </windowRule>
+    <windowRule identifier="librewolf">
+      <action name="ToggleDecorations"/>
+    </windowRule>
+    <windowRule identifier="google-chrome">
+      <action name="ToggleDecorations"/>
+    </windowRule>
+    <windowRule identifier="jetbrains-phpstorm">
+      <action name="ToggleDecorations"/>
+    </windowRule>
+    <windowRule identifier="discord">
+      <action name="ToggleDecorations"/>
+    </windowRule>
+    <windowRule identifier="applet" skipTaskbar="yes" fixedPosition="yes">
+      <action name="SnapToRegion" region="bottom-right"/>
+      <action width="550" />
+      <action height="400" />
+      <action name="ToggleDecorations"/>
+    </windowRule>
+    <windowRule identifier="wifi" skipTaskbar="yes" fixedPosition="yes">
+      <action name="SnapToRegion" region="bottom-right"/>
+      <action name="ToggleDecorations"/>
+    </windowRule>
+  </windowRules>
+
+  <menu>
+    <ignoreButtonReleasePeriod>250</ignoreButtonReleasePeriod>
+     <showIcons>no</showIcons>
+  </menu>
+
+</labwc_config>

@@ -25,11 +25,17 @@ input type:touchpad {
     middle_emulation enabled
 }
 
+input type:pointer {
+	natural_scroll enabled
+}
+
 input type:keyboard {
-    xkb_layout "us,hu"
-    xkb_options "grp:caps_toggle"
     repeat_delay 300
     repeat_rate 30
+
+    xkb_layout "us,hu"
+    xkb_options "grp:caps_toggle"
+    xkb_numlock enabled
 }
 
 mouse_warping container
@@ -54,6 +60,9 @@ bindsym $mod+Left focus left
 bindsym $mod+Down focus down
 bindsym $mod+Up focus up
 bindsym $mod+Right focus right
+
+bindgesture swipe:right workspace prev
+bindgesture swipe:left workspace next
 
 bindsym $mod+Shift+$left move left
 bindsym $mod+Shift+$down move down
@@ -91,8 +100,8 @@ bindsym $mod+space focus mode_toggle
 
 bindsym $mod+a focus parent
 
-bindsym $mod+Shift+minus move scratchpad
-bindsym $mod+minus scratchpad show
+# bindsym $mod+Shift+minus move scratchpad
+# bindsym $mod+minus scratchpad show
 
 mode "resize" {
     bindsym $left resize shrink width 10px
@@ -138,7 +147,5 @@ bar {
 		#inactive_workspace #32323200 #32323200 #5c5c5c
     }
 }
-
-
 
 include /etc/sway/config.d/*
