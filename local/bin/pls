@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-VERSION="1.4.0"
+VERSION="1.5.0"
 
 PLS_DIR="${PLS_DIR:-$HOME/.local/share/pls}"
 PLS_CONFIG_DIR="${PLS_CONFIG_DIR:-$HOME/.config/pls}"
@@ -27,17 +27,26 @@ MAIL_UI_PORT="${MAIL_UI_PORT:-8025}"
 
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/Codes}"
 
-detect_system_php_version() {
-    if command -v php &> /dev/null; then
-        php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;' 2>/dev/null
+php_get_versions() {
+    find "$PHP_VERSIONS_DIR" -maxdepth 1 -type d -name "php-*" 2>/dev/null | \
+        sed 's|.*/php-||' | sort -V
+}
+
+detect_default_php_version() {
+    local latest
+    latest=$(php_get_versions | tail -1)
+    if [ -n "$latest" ]; then
+        echo "$latest"
     else
         echo "8.5"
     fi
 }
-DEFAULT_PHP_VERSION="${DEFAULT_PHP_VERSION:-$(detect_system_php_version)}"
+DEFAULT_PHP_VERSION="${DEFAULT_PHP_VERSION:-$(detect_default_php_version)}"
 
 CADDY_BIN="${CADDY_BIN:-/usr/sbin/caddy}"
-STATIC_PHP_BASE_URL="https://dl.static-php.dev/static-php-cli/bulk"
+SPC_DOCKER_IMAGE="pls-spc"
+SPC_CACHE_DIR="$PLS_DIR/spc-downloads"
+SPC_EXTENSIONS="${SPC_EXTENSIONS:-bcmath,calendar,ctype,curl,dom,exif,fileinfo,filter,gd,iconv,intl,mbstring,mysqli,mysqlnd,opcache,openssl,pcntl,pdo,pdo_mysql,pdo_sqlite,phar,posix,readline,session,simplexml,sockets,sodium,sqlite3,tokenizer,xml,xmlreader,xmlwriter,zip,zlib}"
 
 RED=$'\033[0;31m'
 GREEN=$'\033[0;32m'
@@ -47,7 +56,7 @@ CYAN=$'\033[0;36m'
 BOLD=$'\033[1m'
 NC=$'\033[0m'
 
-mkdir -p "$PLS_CONFIG_DIR" "$PLS_SITES_DIR" "$PLS_CERTS_DIR" "$PLS_LOG_DIR" "$PHP_RUN_DIR" "$MYSQL_DATA_DIR"
+mkdir -p "$PLS_CONFIG_DIR" "$PLS_SITES_DIR" "$PLS_CERTS_DIR" "$PLS_LOG_DIR" "$PHP_RUN_DIR"
 
 print_header() {
     echo -e "${BOLD}${CYAN}$1${NC}"
@@ -67,6 +76,53 @@ print_warning() {
 
 print_info() {
     echo -e "${BLUE}→${NC} $1"
+}
+
+resolve_site() {
+    local usage="$1" name="$2"
+    if [ -z "$name" ]; then
+        print_error "Usage: pls $usage <hostname>"
+        return 1
+    fi
+    local hostname
+    hostname=$(ensure_test_suffix "$name")
+    local site_file="$PLS_SITES_DIR/${hostname}.conf"
+    if [ ! -f "$site_file" ]; then
+        print_error "Site not found: $hostname"
+        return 1
+    fi
+    echo "$hostname"
+}
+
+open_url() {
+    local url="$1"
+    if command -v xdg-open &>/dev/null; then
+        xdg-open "$url" 2>/dev/null &
+    elif command -v open &>/dev/null; then
+        open "$url"
+    elif command -v wslview &>/dev/null; then
+        wslview "$url"
+    else
+        print_error "No browser opener found"
+        echo "  URL: $url"
+        return 1
+    fi
+}
+
+require_docker() {
+    if ! command -v docker &> /dev/null; then
+        print_error "Docker is not installed"
+        echo "  Install: sudo pacman -S docker"
+        echo "           sudo systemctl enable --now docker"
+        echo "           sudo usermod -aG docker \$USER"
+        return 1
+    fi
+    if ! docker info &> /dev/null; then
+        print_error "Docker is not running or user lacks permissions"
+        echo "  Start:  sudo systemctl start docker"
+        echo "  Access: sudo usermod -aG docker \$USER && newgrp docker"
+        return 1
+    fi
 }
 
 init_caddyfile() {
@@ -126,11 +182,6 @@ caddy_reload() {
     print_info "Reloading Caddy configuration..."
     systemctl --user reload pls-caddy.service
     print_success "Configuration reloaded"
-}
-
-php_get_versions() {
-    find "$PHP_VERSIONS_DIR" -maxdepth 1 -type d -name "php-*" 2>/dev/null | \
-        sed 's|.*/php-||' | sort -V
 }
 
 php_is_running() {
@@ -197,10 +248,7 @@ mysql_is_running() {
 }
 
 mysql_start() {
-    if ! command -v docker &> /dev/null; then
-        print_error "Docker is not installed"
-        return 1
-    fi
+    require_docker || return 1
 
     if mysql_is_running; then
         print_warning "MySQL is already running"
@@ -255,10 +303,7 @@ mail_is_running() {
 }
 
 mail_start() {
-    if ! command -v docker &> /dev/null; then
-        print_error "Docker is not installed"
-        return 1
-    fi
+    require_docker || return 1
 
     if mail_is_running; then
         print_warning "Mailpit is already running"
@@ -560,48 +605,18 @@ list_sites() {
 }
 
 open_site() {
-    if [ -z "$1" ]; then
-        print_error "Usage: pls open <hostname>"
-        return 1
-    fi
-
-    local hostname=$(ensure_test_suffix "$1")
-    local site_file="$PLS_SITES_DIR/${hostname}.conf"
-
-    if [ ! -f "$site_file" ]; then
-        print_error "Site not found: $hostname"
-        return 1
-    fi
+    local hostname
+    hostname=$(resolve_site "open" "$1") || return 1
 
     local url="https://${hostname}"
     print_info "Opening $url"
-
-    if command -v xdg-open &>/dev/null; then
-        xdg-open "$url" 2>/dev/null &
-    elif command -v open &>/dev/null; then
-        open "$url"
-    elif command -v wslview &>/dev/null; then
-        wslview "$url"
-    else
-        print_error "No browser opener found"
-        echo "  URL: $url"
-        return 1
-    fi
+    open_url "$url"
 }
 
 edit_site() {
-    if [ -z "$1" ]; then
-        print_error "Usage: pls edit <hostname>"
-        return 1
-    fi
-
-    local hostname=$(ensure_test_suffix "$1")
+    local hostname
+    hostname=$(resolve_site "edit" "$1") || return 1
     local site_file="$PLS_SITES_DIR/${hostname}.conf"
-
-    if [ ! -f "$site_file" ]; then
-        print_error "Site not found: $hostname"
-        return 1
-    fi
 
     local editor="${EDITOR:-${VISUAL:-nano}}"
     "$editor" "$site_file"
@@ -613,18 +628,9 @@ edit_site() {
 }
 
 info_site() {
-    if [ -z "$1" ]; then
-        print_error "Usage: pls info <hostname>"
-        return 1
-    fi
-
-    local hostname=$(ensure_test_suffix "$1")
+    local hostname
+    hostname=$(resolve_site "info" "$1") || return 1
     local site_file="$PLS_SITES_DIR/${hostname}.conf"
-
-    if [ ! -f "$site_file" ]; then
-        print_error "Site not found: $hostname"
-        return 1
-    fi
 
     local alias_for=$(grep -oP '^# Alias for: \K.+' "$site_file" 2>/dev/null)
     local doc_root=$(grep -oP 'root \* \K[^\s]+' "$site_file" | head -1)
@@ -834,11 +840,7 @@ php_get_bin() {
     local version="$1"
     local php_bin="$PHP_VERSIONS_DIR/php-${version}/php"
 
-    if [ -x "$php_bin" ]; then
-        echo "$php_bin"
-    elif command -v php &> /dev/null; then
-        command -v php
-    fi
+    [ -x "$php_bin" ] && echo "$php_bin"
 }
 
 php_run() {
@@ -882,9 +884,11 @@ cmd_php() {
 }
 
 find_composer() {
+    local pls_composer="$PLS_DIR/composer"
+    [ -f "$pls_composer" ] && { echo "$pls_composer"; return; }
+
     for path in \
         "./composer.phar" \
-        "$(command -v composer 2>/dev/null)" \
         "$HOME/.local/bin/composer" \
         "$HOME/.composer/composer.phar"
     do
@@ -1024,14 +1028,7 @@ cmd_mail() {
             ;;
         open)
             print_info "Opening https://mail.test"
-            if command -v xdg-open &>/dev/null; then
-                xdg-open "https://mail.test" 2>/dev/null &
-            elif command -v open &>/dev/null; then
-                open "https://mail.test"
-            else
-                print_error "No browser opener found"
-                echo "  URL: https://mail.test"
-            fi
+            open_url "https://mail.test"
             ;;
         rm|remove)
             if mail_is_running; then
@@ -1136,7 +1133,6 @@ install_check_deps() {
     local missing=()
 
     command -v curl &> /dev/null || missing+=("curl")
-    command -v tar &> /dev/null || missing+=("tar")
 
     if [ ${#missing[@]} -gt 0 ]; then
         print_error "Missing dependencies: ${missing[*]}"
@@ -1290,20 +1286,7 @@ install_mysql() {
     echo ""
     print_header "Installing MySQL (Docker)"
 
-    if ! command -v docker &> /dev/null; then
-        print_error "Docker is not installed"
-        echo "  Install: sudo pacman -S docker"
-        echo "           sudo systemctl enable --now docker"
-        echo "           sudo usermod -aG docker \$USER"
-        return 1
-    fi
-
-    if ! docker info &> /dev/null; then
-        print_error "Docker is not running or user lacks permissions"
-        echo "  Start:  sudo systemctl start docker"
-        echo "  Access: sudo usermod -aG docker \$USER && newgrp docker"
-        return 1
-    fi
+    require_docker || return 1
 
     print_info "Pulling MySQL image: $MYSQL_IMAGE"
     docker pull "$MYSQL_IMAGE" || {
@@ -1330,20 +1313,7 @@ install_mail() {
     echo ""
     print_header "Installing Mailpit (Local Email Testing)"
 
-    if ! command -v docker &> /dev/null; then
-        print_error "Docker is not installed"
-        echo "  Install: sudo pacman -S docker"
-        echo "           sudo systemctl enable --now docker"
-        echo "           sudo usermod -aG docker \$USER"
-        return 1
-    fi
-
-    if ! docker info &> /dev/null; then
-        print_error "Docker is not running or user lacks permissions"
-        echo "  Start:  sudo systemctl start docker"
-        echo "  Access: sudo usermod -aG docker \$USER && newgrp docker"
-        return 1
-    fi
+    require_docker || return 1
 
     print_info "Pulling Mailpit image: $MAIL_IMAGE"
     docker pull "$MAIL_IMAGE" || {
@@ -1384,25 +1354,32 @@ EOF
     caddy_is_running && caddy_reload
 }
 
-get_php_full_version() {
-    local version="$1"
-
-    local latest=$(curl -sL "${STATIC_PHP_BASE_URL}/" 2>/dev/null | \
-        grep -oP "php-${version}\.[0-9]+-fpm-linux-x86_64" | \
-        sort -V | tail -1 | grep -oP "${version}\.[0-9]+")
-
-    if [ -n "$latest" ]; then
-        echo "$latest"
-        return
+ensure_spc_image() {
+    if docker image inspect "$SPC_DOCKER_IMAGE" &>/dev/null; then
+        return 0
     fi
 
-    case "$version" in
-        8.1) echo "8.1.34" ;;
-        8.2) echo "8.2.30" ;;
-        8.3) echo "8.3.30" ;;
-        8.4) echo "8.4.17" ;;
-        *) echo "" ;;
-    esac
+    require_docker || return 1
+
+    print_info "Building spc Docker image (one-time setup)..."
+    docker build -t "$SPC_DOCKER_IMAGE" - <<'DOCKERFILE'
+FROM alpine:latest
+RUN apk add --no-cache \
+    bash curl gcc g++ git make autoconf automake bison re2c cmake libtool \
+    linux-headers pkgconf perl patch file binutils flex tar xz bzip2 zip \
+    libarchive-tools rsync texinfo gettext-dev icu-dev zlib-dev ccache
+RUN curl -fsSL https://dl.static-php.dev/static-php-cli/spc-bin/nightly/spc-linux-x86_64 \
+    -o /usr/local/bin/spc && chmod +x /usr/local/bin/spc
+WORKDIR /build
+RUN spc doctor --auto-fix
+DOCKERFILE
+
+    if [ $? -eq 0 ]; then
+        print_success "spc Docker image built"
+    else
+        print_error "Failed to build spc Docker image"
+        return 1
+    fi
 }
 
 install_php_version() {
@@ -1414,60 +1391,42 @@ install_php_version() {
         return 0
     fi
 
-    local full_version=$(get_php_full_version "$version")
-    if [ -z "$full_version" ]; then
-        print_error "Unknown PHP version: $version"
+    ensure_spc_image || return 1
+
+    mkdir -p "$SPC_CACHE_DIR" "$version_dir"
+
+    print_info "Building PHP $version with static-php-cli..."
+    print_info "Extensions: $SPC_EXTENSIONS"
+    print_warning "First build may take several minutes"
+
+    local gh_token="${GITHUB_TOKEN:-$(gh auth token 2>/dev/null)}"
+    local -a docker_env=()
+    [ -n "$gh_token" ] && docker_env+=(-e "GITHUB_TOKEN=$gh_token")
+
+    docker run --rm \
+        "${docker_env[@]}" \
+        -e "HOST_UID=$(id -u)" -e "HOST_GID=$(id -g)" \
+        -v "$SPC_CACHE_DIR:/build/downloads" \
+        -v "$version_dir:/dist" \
+        "$SPC_DOCKER_IMAGE" \
+        bash -c "
+            spc download --with-php=$version --for-extensions=\"$SPC_EXTENSIONS\" --prefer-pre-built && \
+            spc build \"$SPC_EXTENSIONS\" --build-cli --build-fpm; \
+            cp buildroot/bin/php buildroot/bin/php-fpm /dist/ 2>/dev/null && \
+            chown \$HOST_UID:\$HOST_GID /dist/php /dist/php-fpm 2>/dev/null
+        "
+
+    if [ -f "$version_dir/php" ] && [ -f "$version_dir/php-fpm" ]; then
+        chmod +x "$version_dir/php" "$version_dir/php-fpm"
+    else
+        print_error "Build produced no binaries"
         return 1
     fi
 
-    print_info "Downloading PHP $full_version..."
-
-    local arch="x86_64"
-    local tmp_dir=$(mktemp -d)
-    mkdir -p "$version_dir"
-
-    local cli_url="${STATIC_PHP_BASE_URL}/php-${full_version}-cli-linux-${arch}.tar.gz"
-    local cli_file="$tmp_dir/cli.tar.gz"
-
-    print_info "Downloading CLI: $cli_url"
-    if curl -fsSL "$cli_url" -o "$cli_file" 2>/dev/null; then
-        tar -xzf "$cli_file" -C "$tmp_dir" 2>/dev/null
-        if [ -f "$tmp_dir/php" ]; then
-            cp "$tmp_dir/php" "$version_dir/php"
-            chmod +x "$version_dir/php"
-            print_success "PHP CLI installed"
-        fi
-        rm -f "$cli_file"
-        rm -f "$tmp_dir/php" "$tmp_dir/LICENSE" 2>/dev/null
-    else
-        print_warning "CLI download failed, will use system PHP as fallback"
-    fi
-
-    local fpm_url="${STATIC_PHP_BASE_URL}/php-${full_version}-fpm-linux-${arch}.tar.gz"
-    local fpm_file="$tmp_dir/fpm.tar.gz"
-
-    print_info "Downloading FPM: $fpm_url"
-    if curl -fsSL "$fpm_url" -o "$fpm_file" 2>/dev/null; then
-        tar -xzf "$fpm_file" -C "$tmp_dir" 2>/dev/null
-        if [ -f "$tmp_dir/php-fpm" ]; then
-            cp "$tmp_dir/php-fpm" "$version_dir/php-fpm"
-            chmod +x "$version_dir/php-fpm"
-            print_success "PHP-FPM installed"
-        fi
-        if [ ! -x "$version_dir/php" ] && [ -f "$tmp_dir/php" ]; then
-            cp "$tmp_dir/php" "$version_dir/php"
-            chmod +x "$version_dir/php"
-        fi
-    else
-        print_error "FPM download failed for PHP $version"
-        rm -rf "$tmp_dir"
-        return 1
-    fi
-
-    rm -rf "$tmp_dir"
     install_php_fpm_config "$version"
 
-    print_success "PHP $full_version installed"
+    local php_full=$("$version_dir/php" -v 2>/dev/null | head -1 | cut -d' ' -f2 || echo "$version")
+    print_success "PHP $php_full built and installed"
 }
 
 install_php_fpm_config() {
@@ -1511,7 +1470,7 @@ install_php_all() {
     echo ""
     print_header "Installing PHP versions"
 
-    local versions=("8.1" "8.2" "8.3" "8.4")
+    local versions=("8.2" "8.3" "8.4" "8.5")
 
     for version in "${versions[@]}"; do
         install_php_version "$version" || true
@@ -1543,15 +1502,12 @@ install_composer() {
     echo ""
     print_header "Installing Composer"
 
-    local composer_bin="$HOME/.local/bin/composer"
+    local composer_bin="$PLS_DIR/composer"
 
     if [ -x "$composer_bin" ]; then
-        print_success "Composer already installed: $("$composer_bin" --version 2>/dev/null | head -1)"
-        return 0
-    fi
-
-    if command -v composer &> /dev/null; then
-        print_success "Composer already installed (system): $(composer --version 2>/dev/null | head -1)"
+        local php_bin=$(php_get_bin "$DEFAULT_PHP_VERSION")
+        [ -z "$php_bin" ] && php_bin="php"
+        print_success "Composer already installed: $("$php_bin" "$composer_bin" --version 2>/dev/null | head -1)"
         return 0
     fi
 
@@ -1560,13 +1516,13 @@ install_composer() {
     local php_bin=$(php_get_bin "$DEFAULT_PHP_VERSION")
     [ -z "$php_bin" ] && php_bin="php"
 
-    curl -sS https://getcomposer.org/installer | "$php_bin" -- --install-dir="$HOME/.local/bin" --filename=composer || {
+    curl -sS https://getcomposer.org/installer | "$php_bin" -- --install-dir="$PLS_DIR" --filename=composer || {
         print_error "Failed to install Composer"
         return 1
     }
 
     chmod +x "$composer_bin"
-    print_success "Composer installed: $HOME/.local/bin/composer"
+    print_success "Composer installed: $PLS_DIR/composer"
 }
 
 install_linger() {
@@ -1597,10 +1553,6 @@ install_shell_aliases() {
     echo -e "  ${CYAN}alias composer=\"pls composer\"${NC}"
     echo -e "  ${CYAN}alias mysql=\"pls mysql\"${NC}"
     echo ""
-}
-
-cmd_deps() {
-    echo "caddy mkcert nss dnsmasq docker curl tar"
 }
 
 cmd_install() {
