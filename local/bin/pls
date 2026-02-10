@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-VERSION="1.5.0"
+VERSION="1.6.0"
 
 PLS_DIR="${PLS_DIR:-$HOME/.local/share/pls}"
 PLS_CONFIG_DIR="${PLS_CONFIG_DIR:-$HOME/.config/pls}"
@@ -43,7 +43,26 @@ detect_default_php_version() {
 }
 DEFAULT_PHP_VERSION="${DEFAULT_PHP_VERSION:-$(detect_default_php_version)}"
 
-CADDY_BIN="${CADDY_BIN:-/usr/sbin/caddy}"
+detect_distro() {
+    DISTRO_FAMILY="unknown"
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        case "$ID" in
+            arch|endeavouros|manjaro|garuda)
+                DISTRO_FAMILY="arch" ;;
+            debian|ubuntu|linuxmint|pop|elementary|zorin|kali)
+                DISTRO_FAMILY="debian" ;;
+            *)
+                case "${ID_LIKE:-}" in
+                    *arch*)            DISTRO_FAMILY="arch" ;;
+                    *debian*|*ubuntu*) DISTRO_FAMILY="debian" ;;
+                esac ;;
+        esac
+    fi
+}
+detect_distro
+
+CADDY_BIN="${CADDY_BIN:-$(command -v caddy 2>/dev/null || echo /usr/sbin/caddy)}"
 SPC_DOCKER_IMAGE="pls-spc"
 SPC_CACHE_DIR="$PLS_DIR/spc-downloads"
 SPC_EXTENSIONS="${SPC_EXTENSIONS:-bcmath,calendar,ctype,curl,dom,exif,fileinfo,filter,gd,iconv,intl,mbstring,mysqli,mysqlnd,opcache,openssl,pcntl,pdo,pdo_mysql,pdo_sqlite,phar,posix,readline,session,simplexml,sockets,sodium,sqlite3,tokenizer,xml,xmlreader,xmlwriter,zip,zlib}"
@@ -55,6 +74,22 @@ BLUE=$'\033[0;34m'
 CYAN=$'\033[0;36m'
 BOLD=$'\033[1m'
 NC=$'\033[0m'
+
+pkg_install() {
+    case "$DISTRO_FAMILY" in
+        arch)   sudo pacman -S --needed --noconfirm "$@" ;;
+        debian) sudo apt-get install -y "$@" ;;
+        *)      echo "Unsupported distro. Install manually: $*"; return 1 ;;
+    esac
+}
+
+pkg_hint() {
+    case "$DISTRO_FAMILY" in
+        arch)   echo "sudo pacman -S $*" ;;
+        debian) echo "sudo apt install $*" ;;
+        *)      echo "(install: $*)" ;;
+    esac
+}
 
 mkdir -p "$PLS_CONFIG_DIR" "$PLS_SITES_DIR" "$PLS_CERTS_DIR" "$PLS_LOG_DIR" "$PHP_RUN_DIR"
 
@@ -112,7 +147,9 @@ open_url() {
 require_docker() {
     if ! command -v docker &> /dev/null; then
         print_error "Docker is not installed"
-        echo "  Install: sudo pacman -S docker"
+        local _docker_pkg="docker"
+        [ "$DISTRO_FAMILY" = "debian" ] && _docker_pkg="docker.io"
+        echo "  Install: $(pkg_hint "$_docker_pkg")"
         echo "           sudo systemctl enable --now docker"
         echo "           sudo usermod -aG docker \$USER"
         return 1
@@ -383,7 +420,9 @@ generate_cert() {
 
     if ! command -v mkcert &> /dev/null; then
         print_error "mkcert is not installed"
-        echo "  Install: sudo pacman -S mkcert nss && mkcert -install"
+        local _nss_pkg="nss"
+        [ "$DISTRO_FAMILY" = "debian" ] && _nss_pkg="libnss3-tools"
+        echo "  Install: $(pkg_hint mkcert "$_nss_pkg") && mkcert -install"
         return 1
     fi
 
@@ -670,7 +709,9 @@ cmd_trust() {
 
     if ! command -v mkcert &>/dev/null; then
         print_error "mkcert is not installed"
-        echo "  Install: sudo pacman -S mkcert nss"
+        local _nss_pkg="nss"
+        [ "$DISTRO_FAMILY" = "debian" ] && _nss_pkg="libnss3-tools"
+        echo "  Install: $(pkg_hint mkcert "$_nss_pkg")"
         return 1
     fi
 
@@ -696,7 +737,13 @@ cmd_trust() {
     echo -e "  ${BLUE}Expires:${NC} $ca_expiry"
 
     echo ""
-    if trust list 2>/dev/null | grep -q "mkcert"; then
+    local _ca_trusted=false
+    if command -v trust &>/dev/null && trust list 2>/dev/null | grep -qi "mkcert"; then
+        _ca_trusted=true
+    elif find /usr/local/share/ca-certificates -name '*mkcert*' -print -quit 2>/dev/null | grep -q .; then
+        _ca_trusted=true
+    fi
+    if $_ca_trusted; then
         print_success "CA is trusted by the system"
     else
         print_warning "CA may not be in system trust store"
@@ -1136,7 +1183,7 @@ install_check_deps() {
 
     if [ ${#missing[@]} -gt 0 ]; then
         print_error "Missing dependencies: ${missing[*]}"
-        echo "  Install: sudo pacman -S ${missing[*]}"
+        echo "  Install: $(pkg_hint "${missing[@]}")"
         return 1
     fi
     return 0
@@ -1150,10 +1197,24 @@ install_caddy() {
         print_success "Caddy already installed: $("$CADDY_BIN" version 2>/dev/null | head -1)"
     else
         print_info "Installing Caddy..."
-        sudo pacman -S --needed --noconfirm caddy || {
-            print_error "Failed to install Caddy"
-            return 1
-        }
+        if [ "$DISTRO_FAMILY" = "debian" ]; then
+            sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl 2>/dev/null
+            curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | \
+                sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg 2>/dev/null
+            curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | \
+                sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+            sudo apt-get update >/dev/null
+            sudo apt-get install -y caddy || {
+                print_error "Failed to install Caddy"
+                return 1
+            }
+        else
+            pkg_install caddy || {
+                print_error "Failed to install Caddy"
+                return 1
+            }
+        fi
+        CADDY_BIN="$(command -v caddy 2>/dev/null || echo /usr/sbin/caddy)"
     fi
 
     print_info "Setting port capability..."
@@ -1162,14 +1223,14 @@ install_caddy() {
     }
 
     print_info "Creating systemd service..."
-    cat > "$HOME/.config/systemd/user/pls-caddy.service" << 'EOF'
+    cat > "$HOME/.config/systemd/user/pls-caddy.service" << EOF
 [Unit]
 Description=Caddy Web Server (pls)
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/caddy run --config %h/.config/pls/Caddyfile --adapter caddyfile
+ExecStart=$CADDY_BIN run --config %h/.config/pls/Caddyfile --adapter caddyfile
 ExecReload=/usr/bin/curl -s http://localhost:2019/load -H "Content-Type: text/caddyfile" --data-binary @%h/.config/pls/Caddyfile
 Restart=on-failure
 RestartSec=5
@@ -1189,12 +1250,16 @@ install_mkcert() {
     echo ""
     print_header "Installing mkcert (HTTPS)"
 
+    local _nss_pkg="nss"
+    [ "$DISTRO_FAMILY" = "debian" ] && _nss_pkg="libnss3-tools"
+
     if command -v mkcert &> /dev/null; then
         print_success "mkcert already installed"
     else
         print_info "Installing mkcert..."
-        sudo pacman -S --needed --noconfirm mkcert nss || {
+        pkg_install mkcert "$_nss_pkg" || {
             print_error "Failed to install mkcert"
+            [ "$DISTRO_FAMILY" = "debian" ] && echo "  On older Debian/Ubuntu: https://github.com/FiloSottile/mkcert/releases"
             return 1
         }
     fi
@@ -1215,7 +1280,7 @@ install_dnsmasq() {
         print_success "dnsmasq already installed"
     else
         print_info "Installing dnsmasq..."
-        sudo pacman -S --needed --noconfirm dnsmasq || {
+        pkg_install dnsmasq || {
             print_error "Failed to install dnsmasq"
             return 1
         }
@@ -1226,16 +1291,24 @@ install_dnsmasq() {
         sudo sed -i 's/^#conf-dir=\/etc\/dnsmasq.d$/conf-dir=\/etc\/dnsmasq.d/' /etc/dnsmasq.conf
     fi
 
+    # Detect upstream resolver
+    local upstream_resolv="/etc/resolv.conf"
+    if [ -f /run/NetworkManager/resolv.conf ]; then
+        upstream_resolv="/run/NetworkManager/resolv.conf"
+    elif [ -f /run/systemd/resolve/resolv.conf ]; then
+        upstream_resolv="/run/systemd/resolve/resolv.conf"
+    fi
+
     local dnsmasq_conf="/etc/dnsmasq.d/pls.conf"
     print_info "Configuring dnsmasq..."
     sudo mkdir -p /etc/dnsmasq.d
-    cat << 'DNSCONF' | sudo tee "$dnsmasq_conf" > /dev/null
+    cat << DNSCONF | sudo tee "$dnsmasq_conf" > /dev/null
 # pls - PHP Local Server DNS config
 # .test domain -> localhost
 address=/test/127.0.0.1
 
-# Use upstream DNS from NetworkManager (DHCP/router)
-resolv-file=/run/NetworkManager/resolv.conf
+# Use upstream DNS
+resolv-file=$upstream_resolv
 
 # Only bind to localhost
 listen-address=127.0.0.1
@@ -1244,8 +1317,19 @@ DNSCONF
 
     sudo rm -f /etc/dnsmasq.d/test-tld.conf 2>/dev/null
 
-    local nm_conf="/etc/NetworkManager/conf.d/dns.conf"
+    # Disable systemd-resolved stub listener (common on Debian/Ubuntu)
+    if systemctl is-active --quiet systemd-resolved 2>/dev/null; then
+        print_info "Disabling systemd-resolved stub listener..."
+        sudo mkdir -p /etc/systemd/resolved.conf.d
+        cat << 'RESCONF' | sudo tee /etc/systemd/resolved.conf.d/pls-no-stub.conf > /dev/null
+[Resolve]
+DNSStubListener=no
+RESCONF
+        sudo systemctl restart systemd-resolved
+    fi
+
     if [ -d "/etc/NetworkManager" ]; then
+        local nm_conf="/etc/NetworkManager/conf.d/dns.conf"
         print_info "Configuring NetworkManager..."
         sudo rm -f /etc/NetworkManager/conf.d/dnsmasq.conf 2>/dev/null
         cat << 'NMCONF' | sudo tee "$nm_conf" > /dev/null
