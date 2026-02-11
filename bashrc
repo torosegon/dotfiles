@@ -22,6 +22,7 @@ alias php="pls php"
 alias composer="pls composer"
 
 alias artisan="php artisan"
+alias pint="php vendor/bin/pint"
 
 PS1='\[\e[1m\]\w\[\e[0m\]$(if [[ $EUID -eq 0 ]]; then echo " #"; else echo " >"; fi) '
 
