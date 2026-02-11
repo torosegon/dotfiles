@@ -63,7 +63,7 @@ detect_distro() {
 detect_distro
 
 CADDY_BIN="${CADDY_BIN:-$(command -v caddy 2>/dev/null || echo /usr/sbin/caddy)}"
-SPC_DOCKER_IMAGE="pls-spc"
+SPC_PODMAN_IMAGE="pls-spc"
 SPC_CACHE_DIR="$PLS_DIR/spc-downloads"
 SPC_EXTENSIONS="${SPC_EXTENSIONS:-bcmath,calendar,ctype,curl,dom,exif,fileinfo,filter,gd,iconv,intl,mbstring,mysqli,mysqlnd,opcache,openssl,pcntl,pdo,pdo_mysql,pdo_sqlite,phar,posix,readline,session,simplexml,sockets,sodium,sqlite3,tokenizer,xml,xmlreader,xmlwriter,zip,zlib}"
 
@@ -144,20 +144,10 @@ open_url() {
     fi
 }
 
-require_docker() {
-    if ! command -v docker &> /dev/null; then
-        print_error "Docker is not installed"
-        local _docker_pkg="docker"
-        [ "$DISTRO_FAMILY" = "debian" ] && _docker_pkg="docker.io"
-        echo "  Install: $(pkg_hint "$_docker_pkg")"
-        echo "           sudo systemctl enable --now docker"
-        echo "           sudo usermod -aG docker \$USER"
-        return 1
-    fi
-    if ! docker info &> /dev/null; then
-        print_error "Docker is not running or user lacks permissions"
-        echo "  Start:  sudo systemctl start docker"
-        echo "  Access: sudo usermod -aG docker \$USER && newgrp docker"
+require_podman() {
+    if ! command -v podman &> /dev/null; then
+        print_error "Podman is not installed"
+        echo "  Install: $(pkg_hint podman)"
         return 1
     fi
 }
@@ -281,11 +271,11 @@ php_stop_all() {
 }
 
 mysql_is_running() {
-    docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${MYSQL_CONTAINER_NAME}$"
+    podman ps --format '{{.Names}}' 2>/dev/null | grep -q "^${MYSQL_CONTAINER_NAME}$"
 }
 
 mysql_start() {
-    require_docker || return 1
+    require_podman || return 1
 
     if mysql_is_running; then
         print_warning "MySQL is already running"
@@ -293,12 +283,12 @@ mysql_start() {
     fi
 
     # Check if container exists but stopped
-    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MYSQL_CONTAINER_NAME}$"; then
+    if podman ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MYSQL_CONTAINER_NAME}$"; then
         print_info "Starting existing MySQL container..."
-        docker start "$MYSQL_CONTAINER_NAME" > /dev/null
+        podman start "$MYSQL_CONTAINER_NAME" > /dev/null
     else
         print_info "Creating MySQL container..."
-        docker run -d \
+        podman run -d \
             --name "$MYSQL_CONTAINER_NAME" \
             -e MYSQL_ALLOW_EMPTY_PASSWORD=yes \
             -p "127.0.0.1:${MYSQL_PORT}:3306" \
@@ -312,7 +302,7 @@ mysql_start() {
     print_info "Waiting for MySQL to be ready..."
     local retries=30
     while [ $retries -gt 0 ]; do
-        if docker exec "$MYSQL_CONTAINER_NAME" mysqladmin ping -h localhost --silent 2>/dev/null; then
+        if podman exec "$MYSQL_CONTAINER_NAME" mysqladmin ping -h localhost --silent 2>/dev/null; then
             print_success "MySQL started (port $MYSQL_PORT)"
             return 0
         fi
@@ -331,28 +321,28 @@ mysql_stop() {
     fi
 
     print_info "Stopping MySQL..."
-    docker stop "$MYSQL_CONTAINER_NAME" > /dev/null 2>&1
+    podman stop "$MYSQL_CONTAINER_NAME" > /dev/null 2>&1
     print_success "MySQL stopped"
 }
 
 mail_is_running() {
-    docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${MAIL_CONTAINER_NAME}$"
+    podman ps --format '{{.Names}}' 2>/dev/null | grep -q "^${MAIL_CONTAINER_NAME}$"
 }
 
 mail_start() {
-    require_docker || return 1
+    require_podman || return 1
 
     if mail_is_running; then
         print_warning "Mailpit is already running"
         return 0
     fi
 
-    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MAIL_CONTAINER_NAME}$"; then
+    if podman ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MAIL_CONTAINER_NAME}$"; then
         print_info "Starting existing Mailpit container..."
-        docker start "$MAIL_CONTAINER_NAME" > /dev/null
+        podman start "$MAIL_CONTAINER_NAME" > /dev/null
     else
         print_info "Creating Mailpit container..."
-        docker run -d \
+        podman run -d \
             --name "$MAIL_CONTAINER_NAME" \
             -p "127.0.0.1:${MAIL_SMTP_PORT}:1025" \
             -p "127.0.0.1:${MAIL_UI_PORT}:8025" \
@@ -379,7 +369,7 @@ mail_stop() {
     fi
 
     print_info "Stopping Mailpit..."
-    docker stop "$MAIL_CONTAINER_NAME" > /dev/null 2>&1
+    podman stop "$MAIL_CONTAINER_NAME" > /dev/null 2>&1
     print_success "Mailpit stopped"
 }
 
@@ -829,22 +819,22 @@ cmd_status() {
     fi
 
     echo -n "  MySQL:   "
-    if ! command -v docker &> /dev/null; then
-        echo -e "${RED}●${NC} docker not installed"
+    if ! command -v podman &> /dev/null; then
+        echo -e "${RED}●${NC} podman not installed"
     elif mysql_is_running; then
-        echo -e "${GREEN}●${NC} running (docker)"
-    elif docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MYSQL_CONTAINER_NAME}$"; then
+        echo -e "${GREEN}●${NC} running (podman)"
+    elif podman ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MYSQL_CONTAINER_NAME}$"; then
         echo -e "${RED}●${NC} stopped"
     else
         echo -e "${YELLOW}●${NC} not created"
     fi
 
     echo -n "  Mailpit: "
-    if ! command -v docker &> /dev/null; then
-        echo -e "${RED}●${NC} docker not installed"
+    if ! command -v podman &> /dev/null; then
+        echo -e "${RED}●${NC} podman not installed"
     elif mail_is_running; then
         echo -e "${GREEN}●${NC} running (SMTP: $MAIL_SMTP_PORT, UI: https://mail.test)"
-    elif docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MAIL_CONTAINER_NAME}$"; then
+    elif podman ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MAIL_CONTAINER_NAME}$"; then
         echo -e "${RED}●${NC} stopped"
     else
         echo -e "${YELLOW}●${NC} not created"
@@ -978,7 +968,7 @@ cmd_mysql() {
                 print_success "MySQL is running"
                 echo "  Container: $MYSQL_CONTAINER_NAME"
                 echo "  Port:      127.0.0.1:$MYSQL_PORT"
-                echo "  Image:     $(docker inspect --format '{{.Config.Image}}' "$MYSQL_CONTAINER_NAME" 2>/dev/null)"
+                echo "  Image:     $(podman inspect --format '{{.Config.Image}}' "$MYSQL_CONTAINER_NAME" 2>/dev/null)"
             else
                 print_warning "MySQL is not running"
             fi
@@ -995,7 +985,7 @@ cmd_mysql() {
                 return 1
             fi
             print_info "Exporting $db to $file..."
-            docker exec "$MYSQL_CONTAINER_NAME" mysqldump -u root "$db" > "$file" || {
+            podman exec "$MYSQL_CONTAINER_NAME" mysqldump -u root "$db" > "$file" || {
                 print_error "Export failed"
                 return 1
             }
@@ -1017,7 +1007,7 @@ cmd_mysql() {
                 return 1
             fi
             print_info "Importing $file to $db..."
-            docker exec -i "$MYSQL_CONTAINER_NAME" mysql -u root "$db" < "$file" || {
+            podman exec -i "$MYSQL_CONTAINER_NAME" mysql -u root "$db" < "$file" || {
                 print_error "Import failed"
                 return 1
             }
@@ -1026,11 +1016,11 @@ cmd_mysql() {
         rm|remove)
             if mysql_is_running; then
                 print_info "Stopping MySQL container..."
-                docker stop "$MYSQL_CONTAINER_NAME" > /dev/null 2>&1
+                podman stop "$MYSQL_CONTAINER_NAME" > /dev/null 2>&1
             fi
-            if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MYSQL_CONTAINER_NAME}$"; then
+            if podman ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MYSQL_CONTAINER_NAME}$"; then
                 print_info "Removing MySQL container..."
-                docker rm "$MYSQL_CONTAINER_NAME" > /dev/null 2>&1
+                podman rm "$MYSQL_CONTAINER_NAME" > /dev/null 2>&1
                 print_success "MySQL container removed"
             else
                 print_warning "MySQL container does not exist"
@@ -1044,9 +1034,9 @@ cmd_mysql() {
             fi
 
             if [ $# -eq 0 ]; then
-                docker exec -it "$MYSQL_CONTAINER_NAME" mysql -u root
+                podman exec -it "$MYSQL_CONTAINER_NAME" mysql -u root
             else
-                docker exec -it "$MYSQL_CONTAINER_NAME" mysql -u root "$@"
+                podman exec -it "$MYSQL_CONTAINER_NAME" mysql -u root "$@"
             fi
             ;;
     esac
@@ -1068,7 +1058,7 @@ cmd_mail() {
                 echo "  Container: $MAIL_CONTAINER_NAME"
                 echo "  SMTP:      127.0.0.1:$MAIL_SMTP_PORT"
                 echo "  Web UI:    https://mail.test"
-                echo "  Image:     $(docker inspect --format '{{.Config.Image}}' "$MAIL_CONTAINER_NAME" 2>/dev/null)"
+                echo "  Image:     $(podman inspect --format '{{.Config.Image}}' "$MAIL_CONTAINER_NAME" 2>/dev/null)"
             else
                 print_warning "Mailpit is not running"
             fi
@@ -1080,11 +1070,11 @@ cmd_mail() {
         rm|remove)
             if mail_is_running; then
                 print_info "Stopping Mailpit container..."
-                docker stop "$MAIL_CONTAINER_NAME" > /dev/null 2>&1
+                podman stop "$MAIL_CONTAINER_NAME" > /dev/null 2>&1
             fi
-            if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MAIL_CONTAINER_NAME}$"; then
+            if podman ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${MAIL_CONTAINER_NAME}$"; then
                 print_info "Removing Mailpit container..."
-                docker rm "$MAIL_CONTAINER_NAME" > /dev/null 2>&1
+                podman rm "$MAIL_CONTAINER_NAME" > /dev/null 2>&1
                 print_success "Mailpit container removed"
             else
                 print_warning "Mailpit container does not exist"
@@ -1140,14 +1130,14 @@ cmd_logs() {
             ;;
         mysql)
             if mysql_is_running; then
-                docker logs -f "$MYSQL_CONTAINER_NAME"
+                podman logs -f "$MYSQL_CONTAINER_NAME"
             else
                 print_warning "MySQL is not running"
             fi
             ;;
         mail|mailpit)
             if mail_is_running; then
-                docker logs -f "$MAIL_CONTAINER_NAME"
+                podman logs -f "$MAIL_CONTAINER_NAME"
             else
                 print_warning "Mailpit is not running"
             fi
@@ -1368,19 +1358,19 @@ NMCONF
 
 install_mysql() {
     echo ""
-    print_header "Installing MySQL (Docker)"
+    print_header "Installing MySQL (Podman)"
 
-    require_docker || return 1
+    require_podman || return 1
 
     print_info "Pulling MySQL image: $MYSQL_IMAGE"
-    docker pull "$MYSQL_IMAGE" || {
+    podman pull "$MYSQL_IMAGE" || {
         print_error "Failed to pull MySQL image"
         return 1
     }
 
     mkdir -p "$MYSQL_DATA_DIR"
 
-    print_success "MySQL Docker configured"
+    print_success "MySQL Podman configured"
     echo ""
     echo "  Image:     $MYSQL_IMAGE"
     echo "  Container: $MYSQL_CONTAINER_NAME"
@@ -1397,10 +1387,10 @@ install_mail() {
     echo ""
     print_header "Installing Mailpit (Local Email Testing)"
 
-    require_docker || return 1
+    require_podman || return 1
 
     print_info "Pulling Mailpit image: $MAIL_IMAGE"
-    docker pull "$MAIL_IMAGE" || {
+    podman pull "$MAIL_IMAGE" || {
         print_error "Failed to pull Mailpit image"
         return 1
     }
@@ -1439,14 +1429,14 @@ EOF
 }
 
 ensure_spc_image() {
-    if docker image inspect "$SPC_DOCKER_IMAGE" &>/dev/null; then
+    if podman image inspect "$SPC_PODMAN_IMAGE" &>/dev/null; then
         return 0
     fi
 
-    require_docker || return 1
+    require_podman || return 1
 
-    print_info "Building spc Docker image (one-time setup)..."
-    docker build -t "$SPC_DOCKER_IMAGE" - <<'DOCKERFILE'
+    print_info "Building spc Podman image (one-time setup)..."
+    podman build -t "$SPC_PODMAN_IMAGE" - <<'DOCKERFILE'
 FROM alpine:latest
 RUN apk add --no-cache \
     bash curl gcc g++ git make autoconf automake bison re2c cmake libtool \
@@ -1459,9 +1449,9 @@ RUN spc doctor --auto-fix
 DOCKERFILE
 
     if [ $? -eq 0 ]; then
-        print_success "spc Docker image built"
+        print_success "spc Podman image built"
     else
-        print_error "Failed to build spc Docker image"
+        print_error "Failed to build spc Podman image"
         return 1
     fi
 }
@@ -1484,15 +1474,15 @@ install_php_version() {
     print_warning "First build may take several minutes"
 
     local gh_token="${GITHUB_TOKEN:-$(gh auth token 2>/dev/null)}"
-    local -a docker_env=()
-    [ -n "$gh_token" ] && docker_env+=(-e "GITHUB_TOKEN=$gh_token")
+    local -a podman_env=()
+    [ -n "$gh_token" ] && podman_env+=(-e "GITHUB_TOKEN=$gh_token")
 
-    docker run --rm \
-        "${docker_env[@]}" \
+    podman run --rm \
+        "${podman_env[@]}" \
         -e "HOST_UID=$(id -u)" -e "HOST_GID=$(id -g)" \
         -v "$SPC_CACHE_DIR:/build/downloads" \
         -v "$version_dir:/dist" \
-        "$SPC_DOCKER_IMAGE" \
+        "$SPC_PODMAN_IMAGE" \
         bash -c "
             spc download --with-php=$version --for-extensions=\"$SPC_EXTENSIONS\" --prefer-pre-built && \
             spc build \"$SPC_EXTENSIONS\" --build-cli --build-fpm; \
@@ -1748,7 +1738,7 @@ ${BOLD}PHP-FPM MANAGEMENT${NC}
   ${BLUE}php stop${NC} [ver]     Stop PHP-FPM
   ${BLUE}php restart${NC} [ver]  Restart PHP-FPM
 
-${BOLD}MYSQL (Docker, alias mysql="pls mysql")${NC}
+${BOLD}MYSQL (Podman, alias mysql="pls mysql")${NC}
   ${BLUE}mysql${NC}              Open MySQL CLI (root, no password)
   ${BLUE}mysql${NC} <args>       Run MySQL client with arguments
   ${BLUE}mysql start${NC}        Start MySQL container
@@ -1771,7 +1761,7 @@ ${BOLD}MAILPIT (Local Email Testing)${NC}
 ${BOLD}INSTALLATION${NC}
   ${BLUE}install${NC}            Full environment installation
   ${BLUE}install php${NC} [ver]  Install PHP versions
-  ${BLUE}install mysql${NC}      Pull MySQL Docker image
+  ${BLUE}install mysql${NC}      Pull MySQL Podman image
   ${BLUE}install mail${NC}       Install Mailpit (local email)
   ${BLUE}install composer${NC}   Install Composer
 
