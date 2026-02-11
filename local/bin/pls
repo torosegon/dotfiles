@@ -144,10 +144,21 @@ open_url() {
     fi
 }
 
+pkg_install() {
+    if command -v pacman &>/dev/null; then
+        sudo pacman -S --needed --noconfirm "$@"
+    elif command -v apt &>/dev/null; then
+        sudo apt install -y "$@"
+    else
+        print_error "No supported package manager found (pacman/apt)"
+        return 1
+    fi
+}
+
 require_podman() {
-    if ! command -v podman &> /dev/null; then
+    if ! command -v podman &>/dev/null; then
         print_error "Podman is not installed"
-        echo "  Install: $(pkg_hint podman)"
+        echo "  Run: pls install"
         return 1
     fi
 }
@@ -408,11 +419,9 @@ generate_cert() {
         return 0
     fi
 
-    if ! command -v mkcert &> /dev/null; then
+    if ! command -v mkcert &>/dev/null; then
         print_error "mkcert is not installed"
-        local _nss_pkg="nss"
-        [ "$DISTRO_FAMILY" = "debian" ] && _nss_pkg="libnss3-tools"
-        echo "  Install: $(pkg_hint mkcert "$_nss_pkg") && mkcert -install"
+        echo "  Run: pls install"
         return 1
     fi
 
@@ -699,9 +708,7 @@ cmd_trust() {
 
     if ! command -v mkcert &>/dev/null; then
         print_error "mkcert is not installed"
-        local _nss_pkg="nss"
-        [ "$DISTRO_FAMILY" = "debian" ] && _nss_pkg="libnss3-tools"
-        echo "  Install: $(pkg_hint mkcert "$_nss_pkg")"
+        echo "  Run: pls install"
         return 1
     fi
 
@@ -1166,46 +1173,28 @@ install_directories() {
     print_success "Directories created"
 }
 
-install_check_deps() {
-    local missing=()
+install_deps() {
+    print_header "Installing system packages"
 
-    command -v curl &> /dev/null || missing+=("curl")
+    local packages=(curl podman caddy mkcert dnsmasq)
 
-    if [ ${#missing[@]} -gt 0 ]; then
-        print_error "Missing dependencies: ${missing[*]}"
-        echo "  Install: $(pkg_hint "${missing[@]}")"
-        return 1
+    if command -v pacman &>/dev/null; then
+        packages+=(nss)
+    elif command -v apt &>/dev/null; then
+        packages+=(libnss3-tools)
     fi
-    return 0
+
+    pkg_install "${packages[@]}" || {
+        print_error "Failed to install system packages"
+        return 1
+    }
+
+    print_success "System packages installed"
 }
 
 install_caddy() {
     echo ""
     print_header "Installing Caddy"
-
-    if [ -x "$CADDY_BIN" ]; then
-        print_success "Caddy already installed: $("$CADDY_BIN" version 2>/dev/null | head -1)"
-    else
-        print_info "Installing Caddy..."
-        if [ "$DISTRO_FAMILY" = "debian" ]; then
-            sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl 2>/dev/null
-            curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | \
-                sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg 2>/dev/null
-            curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | \
-                sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
-            sudo apt-get update >/dev/null
-            sudo apt-get install -y caddy || {
-                print_error "Failed to install Caddy"
-                return 1
-            }
-        else
-            pkg_install caddy || {
-                print_error "Failed to install Caddy"
-                return 1
-            }
-        fi
-        CADDY_BIN="$(command -v caddy 2>/dev/null || echo /usr/sbin/caddy)"
-    fi
 
     print_info "Setting port capability..."
     sudo setcap 'cap_net_bind_service=+ep' "$CADDY_BIN" 2>/dev/null || {
@@ -1240,20 +1229,6 @@ install_mkcert() {
     echo ""
     print_header "Installing mkcert (HTTPS)"
 
-    local _nss_pkg="nss"
-    [ "$DISTRO_FAMILY" = "debian" ] && _nss_pkg="libnss3-tools"
-
-    if command -v mkcert &> /dev/null; then
-        print_success "mkcert already installed"
-    else
-        print_info "Installing mkcert..."
-        pkg_install mkcert "$_nss_pkg" || {
-            print_error "Failed to install mkcert"
-            [ "$DISTRO_FAMILY" = "debian" ] && echo "  On older Debian/Ubuntu: https://github.com/FiloSottile/mkcert/releases"
-            return 1
-        }
-    fi
-
     if [ ! -d "$(mkcert -CAROOT 2>/dev/null)" ] || [ ! -f "$(mkcert -CAROOT)/rootCA.pem" ]; then
         print_info "Initializing local CA..."
         mkcert -install
@@ -1265,16 +1240,6 @@ install_mkcert() {
 install_dnsmasq() {
     echo ""
     print_header "Installing dnsmasq (.test domain)"
-
-    if command -v dnsmasq &> /dev/null; then
-        print_success "dnsmasq already installed"
-    else
-        print_info "Installing dnsmasq..."
-        pkg_install dnsmasq || {
-            print_error "Failed to install dnsmasq"
-            return 1
-        }
-    fi
 
     if grep -q "^#conf-dir=/etc/dnsmasq.d$" /etc/dnsmasq.conf 2>/dev/null; then
         print_info "Enabling dnsmasq conf-dir..."
@@ -1638,7 +1603,7 @@ cmd_install() {
 
     case "$component" in
         all)
-            install_check_deps || return 1
+            install_deps || return 1
             install_directories
             install_caddy
             install_mkcert
