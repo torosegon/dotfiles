@@ -17,11 +17,11 @@ PHP_RUN_DIR="$PHP_DIR/run"
 MYSQL_DIR="${MYSQL_DIR:-$HOME/.local/mysql}"
 MYSQL_DATA_DIR="$MYSQL_DIR/data"
 MYSQL_CONTAINER_NAME="pls-mysql"
-MYSQL_IMAGE="${MYSQL_IMAGE:-mysql:8.0}"
+MYSQL_IMAGE="${MYSQL_IMAGE:-docker.io/library/mysql:latest}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
 
 MAIL_CONTAINER_NAME="pls-mailpit"
-MAIL_IMAGE="${MAIL_IMAGE:-axllent/mailpit:latest}"
+MAIL_IMAGE="${MAIL_IMAGE:-docker.io/axllent/mailpit:latest}"
 MAIL_SMTP_PORT="${MAIL_SMTP_PORT:-1025}"
 MAIL_UI_PORT="${MAIL_UI_PORT:-8025}"
 
@@ -65,7 +65,7 @@ detect_distro
 CADDY_BIN="${CADDY_BIN:-$(command -v caddy 2>/dev/null || echo /usr/sbin/caddy)}"
 SPC_PODMAN_IMAGE="pls-spc"
 SPC_CACHE_DIR="$PLS_DIR/spc-downloads"
-SPC_EXTENSIONS="${SPC_EXTENSIONS:-bcmath,calendar,ctype,curl,dom,exif,fileinfo,filter,gd,iconv,intl,mbstring,mysqli,mysqlnd,opcache,openssl,pcntl,pdo,pdo_mysql,pdo_sqlite,phar,posix,readline,session,simplexml,sockets,sodium,sqlite3,tokenizer,xml,xmlreader,xmlwriter,zip,zlib}"
+SPC_EXTENSIONS="${SPC_EXTENSIONS:-bcmath,calendar,ctype,curl,dom,exif,fileinfo,filter,gd,iconv,intl,mbstring,mbregex,mysqli,mysqlnd,opcache,openssl,pcntl,pdo,pdo_mysql,pdo_sqlite,phar,posix,readline,session,simplexml,sockets,sodium,sqlite3,tokenizer,xml,xmlreader,xmlwriter,zip,zlib}"
 
 RED=$'\033[0;31m'
 GREEN=$'\033[0;32m'
@@ -1402,7 +1402,7 @@ ensure_spc_image() {
 
     print_info "Building spc Podman image (one-time setup)..."
     podman build -t "$SPC_PODMAN_IMAGE" - <<'DOCKERFILE'
-FROM alpine:latest
+FROM alpine:3.20
 RUN apk add --no-cache \
     bash curl gcc g++ git make autoconf automake bison re2c cmake libtool \
     linux-headers pkgconf perl patch file binutils flex tar xz bzip2 zip \
