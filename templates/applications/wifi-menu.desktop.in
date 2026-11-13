@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Wi-Fi
+GenericName=Wi-Fi hálózatok
+Comment=Wi-Fi hálózatok kezelése
+Exec=@HOME@/.config/sway/wifi-menu.sh
+Terminal=false
+Categories=Settings;
+Keywords=wifi;wlan;network;internet;hálózat;

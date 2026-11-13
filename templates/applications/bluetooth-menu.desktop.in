@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Bluetooth
+GenericName=Bluetooth eszközök
+Comment=Bluetooth eszközök kezelése
+Exec=@HOME@/.config/sway/bt-menu.sh
+Terminal=false
+Categories=Settings;
+Keywords=bluetooth;bt;fejhallgató;headset;

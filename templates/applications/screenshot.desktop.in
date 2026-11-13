@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Screenshot
+GenericName=Képernyőkép
+Comment=Képernyőkép készítése és szerkesztése
+Exec=@HOME@/.config/sway/screenshot.sh menu
+Terminal=false
+Categories=Utility;
+Keywords=screenshot;screen;capture;képernyőkép;képernyő;

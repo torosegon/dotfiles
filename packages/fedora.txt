@@ -1,0 +1,57 @@
+# Packages needed by the dotfiles (Fedora, installed with dnf).
+# One package per line; lines starting with # are ignored.
+
+# Dotfile manager
+stow
+
+# Compositor, lock screen, idle, wallpapers
+sway
+sway-systemd
+sway-wallpapers
+swaybg
+swayidle
+swaylock
+
+# Launcher, notifications, terminal, screenshots, clipboard
+fuzzel
+mako
+foot
+grim
+slurp
+wl-clipboard
+libnotify
+xdg-user-dirs
+
+# Screenshot annotation (the screenshot script prefers satty, from the terra repo, when installed)
+swappy
+
+# Used by the sway helper scripts (bar, OSD, menus, calculator, dark mode)
+jq
+python3
+procps-ng
+util-linux
+glib2
+gsettings-desktop-schemas
+brightnessctl
+playerctl
+qalculate
+pulseaudio-utils
+pipewire-pulseaudio
+wireplumber
+NetworkManager
+nm-connection-editor
+bluez
+
+# Portals (sway-portals.conf maps these)
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+xdg-desktop-portal-wlr
+
+# Login (tuigreet on greetd, see the "system" step)
+greetd
+greetd-selinux
+tuigreet
+
+# Shell
+fzf
+git

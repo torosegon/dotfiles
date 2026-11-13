@@ -1,0 +1,6 @@
+[terminal]
+vt = 1
+
+[default_session]
+command = "tuigreet --time --time-format '%m-%d %H:%M' --asterisks --remember --remember-session --cmd sway --sessions /usr/share/wayland-sessions --theme 'text=white;time=white;container=black;border=white;title=white;greet=white;prompt=white;input=white;action=white;button=white'"
+user = "greetd"

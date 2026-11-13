@@ -1,0 +1,10 @@
+[Default]
+# Ctrl+S saves a separate copy here instead of littering ~/Desktop.
+# The original screenshot is rewritten when swappy exits (see screenshot.sh, -o).
+save_dir=$HOME/.cache/swappy
+# Copy / save finishes the session, which also writes the original file
+early_exit=true
+# Show the tool panel (brush, text, rectangle, ellipse, arrow, blur) on startup
+show_panel=true
+text_size=24
+line_size=4
