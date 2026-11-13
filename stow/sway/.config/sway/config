@@ -8,7 +8,11 @@ set $term foot
 set $menu fuzzel  --config ~/.config/fuzzel/sway.ini
 
 ### Output
-output * bg /usr/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png fill
+# output * bg /usr/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png fill
+
+### Autostart
+# 1Password in the tray; the delay lets swaybar's tray come up first
+exec sleep 5 && 1password --silent
 
 ### Idle: lock after 5 min, screen off after 10 min, lock before sleep
 exec swayidle -w \
@@ -30,6 +34,9 @@ input type:touchpad {
     middle_emulation enabled
 }
 
+# Focus changes only with keys or clicks, not when the pointer moves over a window
+focus_follows_mouse no
+
 ### Touchpad gestures
 # 3-finger swipe: switch workspace
 bindgesture swipe:3:right workspace prev
@@ -45,11 +52,14 @@ bindgesture pinch:outward fullscreen enable
 
 ### Key bindings
 bindsym $mod+Return exec $term
-bindsym $mod+Shift+q kill
+bindsym $mod+q kill
 bindsym $mod+d exec $menu
 bindsym $mod+c exec ~/.config/sway/calc.sh calc
 bindsym $mod+x exec ~/.config/sway/calc.sh exchange
 bindsym $mod+Ctrl+l exec swaylock -f
+
+# 1Password quick access (global shortcuts do not work on Wayland, so bind it here)
+bindsym $mod+backslash exec 1password --quick-access
 
 # Drag floating windows with $mod + left mouse button, resize with right button
 floating_modifier $mod normal
